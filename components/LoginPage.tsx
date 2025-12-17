@@ -1,86 +1,99 @@
 import React, { useState } from 'react';
-import { BookOpen, Lock, Mail, ArrowRight } from 'lucide-react';
+import { Lock, Mail, ArrowRight } from 'lucide-react';
+import { login } from '@/api/auth';
+import { saveAuth } from '@/utils/auth';
 
 interface LoginPageProps {
-  onLogin: (email: string) => void;
+  onLogin: (user: any) => void;
 }
 
 export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email || !password) return;
-    
+    setError(null);
     setIsLoading(true);
-    // Simulate API call delay
-    setTimeout(() => {
-      onLogin(email);
+
+    try {
+      const data = await login(email, password);
+      saveAuth(data.accessToken, data.refreshToken);
+      // localStorage.setItem('refreshToken', data.refreshToken);
+      
+      onLogin(data.user);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
       setIsLoading(false);
-    }, 1000);
+    }
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4">
-      <div className="w-full max-w-md bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden animate-in fade-in zoom-in duration-500">
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+      <div className="w-full max-w-md bg-white rounded-2xl shadow-xl border border-slate-100">
         <div className="bg-[#008080] p-8 text-center">
-          <div className="w-16 h-16 flex items-center justify-center mx-auto mb-4">
-             <img src="/assets/images/BICMAS-logo.png" />
-          </div>
-          <h1 className="text-2xl font-bold text-white tracking-tight">BICMAS Academy</h1>
-          <p className="text-blue-100 mt-2 font-medium">Trainee Learning Portal</p>
+          <img
+            src="/assets/images/BICMAS-logo.png"
+            className="w-16 h-16 mx-auto mb-4"
+          />
+          <h1 className="text-2xl font-bold text-white">BICMAS Academy</h1>
+          <p className="text-blue-100 mt-2">Trainee Learning Portal</p>
         </div>
 
         <div className="p-8">
           <form onSubmit={handleSubmit} className="space-y-6">
+            {error && (
+              <div className="bg-red-50 text-red-600 text-sm p-3 rounded-lg">
+                {error}
+              </div>
+            )}
+
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-2">Email Address</label>
-              <div className="relative group">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-500 transition-colors" size={20} />
-                <input 
-                  type="email" 
+              <label className="block text-sm font-semibold text-slate-700 mb-2">
+                Email Address
+              </label>
+              <div className="relative">
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-slate-50 focus:bg-white"
-                  placeholder="name@company.com"
                   required
+                  className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-2">Password</label>
-              <div className="relative group">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-500 transition-colors" size={20} />
-                <input 
-                  type="password" 
+              <label className="block text-sm font-semibold text-slate-700 mb-2">
+                Password
+              </label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-slate-50 focus:bg-white"
-                  placeholder="••••••••"
                   required
+                  className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500"
                 />
               </div>
             </div>
 
-            <button 
-              type="submit" 
+            <button
+              type="submit"
               disabled={isLoading}
-              className="w-full bg-[#008080]/70 text-white py-3.5 rounded-xl font-semibold hover:bg-[#008080] transition-all hover:shadow-lg hover:shadow-slate-200 flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed transform active:scale-[0.98]"
+              className="w-full bg-[#008080] text-white py-3 rounded-xl font-semibold flex items-center justify-center gap-2 disabled:opacity-70"
             >
-              {isLoading ? 'Signing in...' : 'Sign In'}
+              {isLoading ? 'Signing in…' : 'Sign In'}
               {!isLoading && <ArrowRight size={18} />}
             </button>
-            
-            <div className="text-center text-sm text-slate-500 mt-6">
-              <a href="#" className="hover:text-blue-600 transition-colors">Forgot password?</a>
-            </div>
           </form>
         </div>
       </div>
-      <p className="mt-8 text-slate-400 text-xs font-medium">© 2025 BICMAS Academy. All rights reserved.</p>
     </div>
   );
 };

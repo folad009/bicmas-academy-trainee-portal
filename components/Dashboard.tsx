@@ -225,7 +225,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
         <div className="flex flex-col md:flex-row justify-between items-end mb-6">
           <div>
              <h1 className="text-3xl font-bold text-slate-900">Dashboard</h1>
-             <p className="text-slate-500 mt-1">Welcome back, <span className="font-semibold text-slate-900">{user.name}</span>. Let's get some BICMAS coins!</p>
+             <p className="text-slate-500 mt-1">Hi <span className="font-semibold text-green-500">{user.name}</span>, welcome back. Let's get some BICMAS coins!</p>
           </div>
           <div className="hidden md:block text-right">
              <div className="text-sm text-slate-500">Current Focus</div>
