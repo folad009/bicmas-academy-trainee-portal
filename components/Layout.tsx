@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { User } from "../types";
 import {
   LayoutDashboard,
@@ -8,7 +8,10 @@ import {
   WifiOff,
   Award,
   MessageCircle,
+  X,
+  Download,
 } from "lucide-react";
+import { usePWAInstall } from "@/hooks/usePWAInstall";
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -52,13 +55,41 @@ export const Layout: React.FC<LayoutProps> = ({
       </span>
     </button>
   );
+  const { isInstallable, promptInstall } = usePWAInstall();
+  const [dismissed, setDismissed] = useState(false);
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row">
+      {isInstallable && !dismissed && (
+        <div className="fixed bottom-4 left-4 right-4 md:left-auto md:right-4 md:w-96 bg-slate-900 text-white rounded-xl shadow-lg p-4 flex items-center gap-3 z-50">
+          <Download size={20} />
+          <div className="flex-1">
+            <p className="font-semibold text-sm">Install BICMAS Academy</p>
+            <p className="text-xs text-slate-300">
+              Learn offline. Faster access. No browser needed.
+            </p>
+          </div>
+
+          <button
+            onClick={promptInstall}
+            className="bg-[#008080] hover:bg-[#004c4c] px-3 py-1.5 rounded-lg text-sm font-medium"
+          >
+            Install
+          </button>
+
+          <button
+            onClick={() => setDismissed(true)}
+            className="text-slate-400 hover:text-white"
+          >
+            <X size={16} />
+          </button>
+        </div>
+      )}
+
       {/* Sidebar for Desktop */}
       <aside className="hidden md:flex w-24 bg-white border-r border-slate-200 flex-col items-center py-6 shrink-0 fixed h-full z-10">
         <div className="w-12 h-12  flex items-center justify-center  mb-8">
-          <img src="/assets/images/BICMAS-logo.png" />
+          <img src="/img/BICMAS-logo.png" />
         </div>
 
         <nav className="flex-1 flex flex-col gap-6 w-full px-2">
