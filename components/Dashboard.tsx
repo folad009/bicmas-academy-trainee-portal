@@ -229,7 +229,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </div>
           <div className="hidden md:block text-right">
              <div className="text-sm text-slate-500">Current Focus</div>
-             <div className="font-semibold text-[#008080]">{/*learningPath.title*/} Van Sales Rep Certification</div>
+             <div className="font-semibold text-[#008080]">{learningPath?.title || "Van Sales Rep Certification"}</div>
           </div>
         </div>
 
@@ -278,10 +278,17 @@ export const Dashboard: React.FC<DashboardProps> = ({
       </section>
 
       {/* 2. Main Dashboard Split: Learning Path & Activity */}
-      <section className="w-full grid grid-cols-1 lg:grid-cols-3 gap-6 h-screen">
+      <section className="w-full grid grid-cols-1 lg:grid-cols-3 gap-6 mni-h-screen">
         {/* Left: Learning Path (Takes 2 columns on large screens) */}
         <div className="lg:col-span-2 h-full">
-           <LearningPathWidget path={learningPath} />
+          {learningPath ? (
+            <LearningPathWidget path={learningPath} />
+          ): (
+            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-8 text-center text-slate-500">
+    No learning path assigned yet.
+  </div>
+          )}
+           
         </div>
         
         {/* Right: Activity Chart & Quick Actions (Takes 1 column) */}
@@ -309,7 +316,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
       {/* 3. Badges & Jump Back In */}
       <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Badges Widget */}
+       {/* Badges Widget */}
         <div className="lg:col-span-1">
            <BadgesWidget badges={stats.badges} />
         </div>

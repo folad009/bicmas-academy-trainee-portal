@@ -27,9 +27,9 @@ export async function registerDevice() {
   const data = text ? JSON.parse(text) : null;
 
   if (!response.ok) {
-    const text = await response.text();
-    throw new Error(text || 'Failed to register device');
+    throw new Error(data?.error || 'Failed to register device');
   }
 
   return data;
 }
+

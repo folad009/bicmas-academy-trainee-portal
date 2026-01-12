@@ -9,240 +9,11 @@ import { Course, CourseStatus, User, LearningPath, UserStats } from "./types";
 import { Search, Filter, Download, LogOut } from "lucide-react";
 import { CourseCard } from "./components/CourseCard";
 import { clearAuth, getAccessToken } from "./utils/auth";
-import { registerDevice } from "./api/device";
-import { isDeviceRegistered, markDeviceRegistered } from "./utils/device";
 
-const MOCK_STATS: UserStats = {
-  streakDays: 12,
-  totalLearningHours: 48.5,
-  completedCourses: 4,
-  averageScore: 92,
-  weeklyActivity: [45, 60, 30, 90, 20, 0, 15], // M T W T F S S (minutes)
-  scoreTrend: 5.2,
-  completedCoursesTrend: 2,
-  bicmasCoins: 1250,
-  badges: [
-    {
-      id: "b1",
-      name: "Safety First",
-      description: "Complete the Basic Safety Course",
-      icon: "shield",
-      earnedDate: "2023-10-15",
-      isLocked: false,
-    },
-    {
-      id: "b2",
-      name: "Fast Learner",
-      description: "Finish a module in record time",
-      icon: "zap",
-      earnedDate: "2023-11-02",
-      isLocked: false,
-    },
-    {
-      id: "b3",
-      name: "Quiz Master",
-      description: "Score 100% on a final exam",
-      icon: "star",
-      earnedDate: "2023-11-10",
-      isLocked: false,
-    },
-    {
-      id: "b4",
-      name: "Dedicated",
-      description: "Maintain a 7-day streak",
-      icon: "medal",
-      isLocked: true,
-    },
-    {
-      id: "b5",
-      name: "Community Voice",
-      description: "Post 5 helpful forum replies",
-      icon: "trophy",
-      isLocked: true,
-    },
-  ],
-};
+import { fetchLearnerDashboard } from "./api/dashboard";
+import { fetchLearningPaths } from "@/api/learningPaths";
+import { mapLearningPath } from "@/mappers/learningPathMapper";
 
-const MOCK_LEARNING_PATH: LearningPath = {
-  id: "lp1",
-  title: "Senior Safety Officer Certification",
-  description: "A comprehensive journey to becoming a certified safety lead.",
-  progress: 35,
-  totalSteps: 5,
-  completedSteps: 1,
-  steps: [
-    {
-      id: "step1",
-      courseId: "c1",
-      title: "Foundation: Workplace Safety",
-      description: "Master the basics of hazard identification and response.",
-      status: "completed",
-      type: "course",
-      estimatedTime: "1h 30m",
-    },
-    {
-      id: "step2",
-      courseId: "c2",
-      title: "Compliance: Data & Privacy",
-      description:
-        "Understand the legal frameworks surrounding data protection.",
-      status: "in-progress",
-      type: "course",
-      estimatedTime: "2h 15m",
-    },
-    {
-      id: "step3",
-      title: "Mid-Term Safety Assessment",
-      description: "A multiple-choice evaluation of core safety concepts.",
-      status: "locked",
-      type: "assessment",
-      estimatedTime: "45m",
-    },
-    {
-      id: "step4",
-      courseId: "c3",
-      title: "Leadership: Communication",
-      description:
-        "Learn to effectively communicate safety protocols to teams.",
-      status: "locked",
-      type: "course",
-      estimatedTime: "3h",
-    },
-    {
-      id: "step5",
-      title: "Final Certification Exam",
-      description:
-        "The final step to earning your Senior Safety Officer badge.",
-      status: "locked",
-      type: "milestone",
-      estimatedTime: "2h",
-    },
-  ],
-};
-
-const MOCK_COURSES: Course[] = [
-  {
-    id: "c1",
-    title: "Workplace Safety Fundamentals",
-    description:
-      "Essential safety protocols for the modern workplace environment. Covers fire safety, ergonomics, and emergency response.",
-    thumbnail: "https://picsum.photos/400/200?random=1",
-    category: "Mandatory",
-    status: CourseStatus.Completed, // Changed to match path
-    progress: 100,
-    totalModules: 4,
-    completedModules: 4,
-    deadline: "2023-11-30",
-    isDownloaded: true,
-    certificateUrl: "#",
-    modules: [
-      {
-        id: "m1",
-        title: "Introduction to Safety",
-        duration: "10 min",
-        isCompleted: true,
-        content:
-          "Safety is everyone's responsibility. In this module, we explore the core pillars of a safe working environment including personal protective equipment (PPE) and situational awareness.",
-      },
-      {
-        id: "m2",
-        title: "Fire Hazards",
-        duration: "15 min",
-        isCompleted: true,
-        content:
-          "Understanding fire classifications (A, B, C, D, K) is crucial. This module details how to use fire extinguishers correctly using the PASS method.",
-      },
-      {
-        id: "m3",
-        title: "Ergonomics",
-        duration: "20 min",
-        isCompleted: true,
-        content:
-          "Proper posture prevents long-term injury. Learn how to set up your desk, lift heavy objects, and take breaks effectively.",
-      },
-      {
-        id: "m4",
-        title: "Emergency Response",
-        duration: "15 min",
-        isCompleted: true,
-        content:
-          "What to do when the alarm sounds. Evacuation routes, assembly points, and the role of fire wardens.",
-      },
-    ],
-  },
-  {
-    id: "c2",
-    title: "Data Privacy & GDPR",
-    description:
-      "Understanding how to handle sensitive personal data in compliance with international regulations.",
-    thumbnail: "https://picsum.photos/400/200?random=2",
-    category: "Mandatory",
-    status: CourseStatus.InProgress,
-    progress: 33,
-    totalModules: 3,
-    completedModules: 1,
-    deadline: "2023-12-15",
-    isDownloaded: false,
-    modules: [
-      {
-        id: "m1",
-        title: "What is PII?",
-        duration: "10 min",
-        isCompleted: true,
-        content:
-          "Personally Identifiable Information (PII) includes names, emails, and biometric data. Learn how to identify it.",
-      },
-      {
-        id: "m2",
-        title: "GDPR Principles",
-        duration: "25 min",
-        isCompleted: false,
-        content:
-          "Lawfulness, fairness, transparency. We dive deep into the 7 key principles of GDPR.",
-      },
-      {
-        id: "m3",
-        title: "Handling Breaches",
-        duration: "15 min",
-        isCompleted: false,
-        content:
-          "Reporting mechanisms and timelines. Who to contact if you suspect a data leak.",
-      },
-    ],
-  },
-  {
-    id: "c3",
-    title: "Effective Communication",
-    description:
-      "Soft skills training for better team collaboration and leadership.",
-    thumbnail: "https://picsum.photos/400/200?random=3",
-    category: "Recommended",
-    status: CourseStatus.NotStarted,
-    progress: 0,
-    totalModules: 2,
-    completedModules: 0,
-    isDownloaded: false,
-    certificateUrl: "#",
-    modules: [
-      {
-        id: "m1",
-        title: "Active Listening",
-        duration: "15 min",
-        isCompleted: false,
-        content:
-          "Listening is more than hearing. It involves feedback, body language, and withholding judgment.",
-      },
-      {
-        id: "m2",
-        title: "Clear Writing",
-        duration: "15 min",
-        isCompleted: false,
-        content:
-          "Writing emails that get read. Structuring your thoughts for impact.",
-      },
-    ],
-  },
-];
 
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -251,10 +22,10 @@ export default function App() {
   const [activeView, setActiveView] = useState("dashboard");
   const [activeCourseId, setActiveCourseId] = useState<string | null>(null);
 
-  const [courses, setCourses] = useState<Course[]>(MOCK_COURSES);
-  const [learningPath, setLearningPath] =
-    useState<LearningPath>(MOCK_LEARNING_PATH);
-  const [stats, setStats] = useState<UserStats>(MOCK_STATS);
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [learningPath, setLearningPath] = useState<LearningPath | null>(null);
+  const [stats, setStats] = useState<UserStats | null>(null);
+  const [isDashboardLoading, setIsDashboardLoading] = useState(true);
 
   // Initialize offline state based on navigator status
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
@@ -298,25 +69,51 @@ export default function App() {
     };
   }, [pendingSync]);
 
-  const handleLogin = async (backendUser: any) => {
-    setUser({
-      id: backendUser.id,
-      name: backendUser.email.split("@")[0],
-      email: backendUser.email,
-      role: backendUser.role,
-      avatar: "https://picsum.photos/200",
-    });
-    setIsAuthenticated(true);
+  useEffect(() => {
+  if (!isAuthenticated || !user) return;
 
+  const loadDashboard = async () => {
     try {
-      if (!isDeviceRegistered()) {
-        await registerDevice();
-        markDeviceRegistered();
-      }
+      setIsDashboardLoading(true);
+
+      const [dashboard, paths] = await Promise.all([
+        fetchLearnerDashboard(),
+        fetchLearningPaths(),
+      ]);
+
+      setCourses(dashboard.courses);
+      setStats(dashboard.stats);
+
+      const publishedPath = paths.find(
+        (p) => p.status === "PUBLISHED"
+      );
+
+      setLearningPath(
+        publishedPath ? mapLearningPath(publishedPath) : null
+      );
     } catch (err) {
-      console.error("Device registration failed:", err);
+      console.error("Dashboard load failed:", err);
+    } finally {
+      setIsDashboardLoading(false);
     }
   };
+
+  loadDashboard();
+}, [isAuthenticated, user]);
+
+
+ const handleLogin = async (backendUser: any) => {
+  setUser({
+    id: backendUser.id,
+    name: backendUser.email.split("@")[0],
+    email: backendUser.email,
+    role: backendUser.role,
+    avatar: "https://picsum.photos/200",
+  });
+
+  setIsAuthenticated(true);
+};
+
 
   const handleLogout = () => {
     clearAuth();
@@ -575,18 +372,23 @@ export default function App() {
           toggleOffline={toggleOffline}
           pendingSync={pendingSync}
         >
-          {activeView === "dashboard" && (
-            <Dashboard
-              courses={courses}
-              learningPath={learningPath}
-              stats={stats}
-              onStartCourse={handleStartCourse}
-              onDownload={handleDownload}
-              onRemoveDownload={handleRemoveDownload}
-              isOfflineMode={isOffline}
-              user={user}
-            />
-          )}
+          {activeView === "dashboard" &&
+            (isDashboardLoading || !stats ? (
+              <div className="p-10 text-center text-slate-500">
+                Loading dashboard…
+              </div>
+            ) : (
+              <Dashboard
+                courses={courses}
+                learningPath={learningPath}
+                stats={stats}
+                onStartCourse={handleStartCourse}
+                onDownload={handleDownload}
+                onRemoveDownload={handleRemoveDownload}
+                isOfflineMode={isOffline}
+                user={user}
+              />
+            ))}
           {activeView === "library" && renderLibrary()}
           {activeView === "community" && <Community user={user} />}
           {activeView === "certificates" && renderCertificates()}
