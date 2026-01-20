@@ -66,7 +66,7 @@ export const CourseCard: React.FC<CourseCardProps> = ({
           </div>
           <div className="flex justify-between text-xs text-slate-500">
             <span>{course.progress}% Complete</span>
-            {course.deadline && <span>Due: {course.deadline}</span>}
+            {course.deadline && <span>Due: {new Date(course.deadline!).toLocaleDateString()}</span>}
           </div>
 
           <div className="flex items-center justify-between border-t border-slate-100 pt-3">

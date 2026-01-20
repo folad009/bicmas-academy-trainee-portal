@@ -6,11 +6,13 @@ export enum CourseStatus {
 }
 
 export interface ScormModule {
+  lessons: any;
   id: string;
   title: string;
   content: string; // HTML content or URL
   duration: string;
   isCompleted: boolean;
+
 }
 
 export interface Course {
@@ -121,4 +123,28 @@ export interface DirectMessage {
   text: string;
   timestamp: string;
   isRead: boolean;
+}
+export interface AssignedCourse {
+  id: string;              // course.id
+  assignmentId: string;    // assignment.id
+  title: string;
+  description: string;
+  status: CourseStatus;
+  progress: number;
+  deadline?: string;
+  thumbnail: string;
+  isDownloaded: boolean;
+}
+
+export interface PlayerLesson {
+  id: string;
+  title: string;
+  scormPackageId: string;
+  isCompleted: boolean;
+}
+
+export interface PlayerModule {
+  id: string;
+  title: string;
+  lessons: PlayerLesson[];
 }

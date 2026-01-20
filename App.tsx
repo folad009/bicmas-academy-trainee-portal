@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Layout } from "./components/Layout";
 import { Dashboard } from "./components/Dashboard";
 import { ScormPlayer } from "./components/ScormPlayer";
@@ -13,6 +13,42 @@ import { clearAuth, getAccessToken } from "./utils/auth";
 import { fetchLearnerDashboard } from "./api/dashboard";
 import { fetchLearningPaths } from "@/api/learningPaths";
 import { mapLearningPath } from "@/mappers/learningPathMapper";
+import { fetchAssignedCourses } from "@/api/assignedCourses";
+import { mapAssignedCourse } from "@/mappers/assignedCourseMapper";
+
+type LibraryFilter = "ALL" | "MANDATORY" | "RECOMMENDED" | "COMPLETED";
+
+const FILTERS: { label: string; value: LibraryFilter }[] = [
+  { label: "All", value: "ALL" },
+  { label: "Mandatory", value: "MANDATORY" },
+  { label: "recommended", value: "RECOMMENDED" },
+  { label: "completed", value: "COMPLETED" },
+];
+
+const DEFAULT_STATS: UserStats = {
+  streakDays: 0,
+  totalLearningHours: 0,
+  bicmasCoins: 0,
+  completedCourses: 0,
+  averageScore: 0,
+  weeklyActivity: [],
+  scoreTrend: 0,
+  completedCoursesTrend: 0,
+  badges: []
+};
+
+const updateCourseProgress = (
+  courses: Course[],
+  courseId: string,
+  progress: number,
+  completedModules: number
+): Course[] =>
+  courses.map((c) => {
+    if (c.id !== courseId) return c;
+    const status =
+      progress === 100 ? CourseStatus.Completed : CourseStatus.InProgress;
+    return { ...c, progress, completedModules, status };
+  });
 
 
 export default function App() {
@@ -22,22 +58,30 @@ export default function App() {
   const [activeView, setActiveView] = useState("dashboard");
   const [activeCourseId, setActiveCourseId] = useState<string | null>(null);
 
-  const [courses, setCourses] = useState<Course[]>([]);
+ const [dashboardCourses, setDashboardCourses] = useState<Course[]>([]);
+const [libraryCourses, setLibraryCourses] = useState<Course[]>([]);
+
+const [isDashboardLoading, setIsDashboardLoading] = useState(false);
+const [isLibraryLoading, setIsLibraryLoading] = useState(false);
+
+
+
   const [learningPath, setLearningPath] = useState<LearningPath | null>(null);
-  const [stats, setStats] = useState<UserStats | null>(null);
-  const [isDashboardLoading, setIsDashboardLoading] = useState(true);
+  const [stats, setStats] = useState<UserStats>(DEFAULT_STATS);
+
+
+  
 
   // Initialize offline state based on navigator status
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
   const [pendingSync, setPendingSync] = useState(0);
   const [selectedCertificate, setSelectedCertificate] = useState<Course | null>(
-    null
+    null,
   );
 
   // Filters for Library
-  const [filter, setFilter] = useState<
-    "All" | "Mandatory" | "Recommended" | "Completed"
-  >("All");
+  const [filter, setFilter] = useState<LibraryFilter>("ALL");
+  const [search, setSearch] = useState("");
 
   // Restore auth on refresh
   useEffect(() => {
@@ -45,7 +89,7 @@ export default function App() {
     if (token) {
       setIsAuthenticated(true);
     }
-  });
+  }, []);
 
   // Network Detection & Auto-Sync
   useEffect(() => {
@@ -72,6 +116,26 @@ export default function App() {
   useEffect(() => {
   if (!isAuthenticated || !user) return;
 
+  const loadLibrary = async () => {
+    try {
+      setIsLibraryLoading(true);
+
+      const assignments = await fetchAssignedCourses();
+      setLibraryCourses(assignments.map(mapAssignedCourse));
+    } catch (err) {
+      console.error("Assigned courses load failed:", err);
+    } finally {
+      setIsLibraryLoading(false);
+    }
+  };
+
+  loadLibrary();
+}, [isAuthenticated, user]);
+
+
+useEffect(() => {
+  if (!isAuthenticated || !user) return;
+
   const loadDashboard = async () => {
     try {
       setIsDashboardLoading(true);
@@ -81,16 +145,11 @@ export default function App() {
         fetchLearningPaths(),
       ]);
 
-      setCourses(dashboard.courses);
+      setDashboardCourses(dashboard.courses);
       setStats(dashboard.stats);
 
-      const publishedPath = paths.find(
-        (p) => p.status === "PUBLISHED"
-      );
-
-      setLearningPath(
-        publishedPath ? mapLearningPath(publishedPath) : null
-      );
+      const publishedPath = paths.find((p) => p.status === "PUBLISHED");
+      setLearningPath(publishedPath ? mapLearningPath(publishedPath) : null);
     } catch (err) {
       console.error("Dashboard load failed:", err);
     } finally {
@@ -102,70 +161,87 @@ export default function App() {
 }, [isAuthenticated, user]);
 
 
- const handleLogin = async (backendUser: any) => {
-  setUser({
-    id: backendUser.id,
-    name: backendUser.email.split("@")[0],
-    email: backendUser.email,
-    role: backendUser.role,
-    avatar: "https://picsum.photos/200",
-  });
+  const handleLogin = async (backendUser: any) => {
+    setUser({
+      id: backendUser.id,
+      name: backendUser.email.split("@")[0],
+      email: backendUser.email,
+      role: backendUser.role,
+      avatar: "https://picsum.photos/200",
+    });
 
-  setIsAuthenticated(true);
+    setIsAuthenticated(true);
+  };
+
+const handleLogout = () => {
+  clearAuth();
+
+  // Auth
+  setIsAuthenticated(false);
+  setUser(null);
+
+  // App state reset (important)
+  setActiveCourseId(null);
+  setActiveView("dashboard");
+
+  setDashboardCourses([]);
+  setLibraryCourses([]);
+  setLearningPath(null);
+  setStats(DEFAULT_STATS);
+
+  setPendingSync(0);
 };
 
-
-  const handleLogout = () => {
-    clearAuth();
-    setIsAuthenticated(false);
-    setUser(null);
-    setActiveView("dashboard");
-  };
 
   const handleStartCourse = (id: string) => {
     setActiveCourseId(id);
   };
 
-  const handleUpdateProgress = (
-    courseId: string,
-    progress: number,
-    completedModules: number
-  ) => {
-    setCourses((prev) =>
-      prev.map((c) => {
-        if (c.id === courseId) {
-          const newStatus =
-            progress === 100 ? CourseStatus.Completed : CourseStatus.InProgress;
-          return { ...c, progress, completedModules, status: newStatus };
-        }
-        return c;
-      })
-    );
+ const handleUpdateProgress = (
+  courseId: string,
+  progress: number,
+  completedModules: number
+) => {
+  setDashboardCourses((prev) =>
+    updateCourseProgress(prev, courseId, progress, completedModules)
+  );
 
-    // Update stats simulation and award coins
-    setStats((prev) => ({
+  setLibraryCourses((prev) =>
+    updateCourseProgress(prev, courseId, progress, completedModules)
+  );
+
+  setStats((prev) => {
+    if (!prev) return prev;
+    return {
       ...prev,
       totalLearningHours: prev.totalLearningHours + 0.1,
-      bicmasCoins: prev.bicmasCoins + 10, // Award coins for progress
-    }));
+      bicmasCoins: prev.bicmasCoins + 10,
+    };
+  });
 
-    // Simulate sync need if offline
-    if (isOffline) {
-      setPendingSync((prev) => prev + 1);
-    }
-  };
+  if (isOffline) {
+    setPendingSync(1); // clamp instead of infinite increment
+  }
+};
 
-  const handleDownload = (courseId: string) => {
-    setCourses((prev) =>
-      prev.map((c) => (c.id === courseId ? { ...c, isDownloaded: true } : c))
-    );
-  };
 
-  const handleRemoveDownload = (courseId: string) => {
-    setCourses((prev) =>
-      prev.map((c) => (c.id === courseId ? { ...c, isDownloaded: false } : c))
-    );
-  };
+const toggleDownloadFlag = (
+  courses: Course[],
+  courseId: string,
+  isDownloaded: boolean
+) =>
+  courses.map((c) =>
+    c.id === courseId ? { ...c, isDownloaded } : c
+  );
+
+const handleDownload = (courseId: string) => {
+  setLibraryCourses((prev) => toggleDownloadFlag(prev, courseId, true));
+};
+
+const handleRemoveDownload = (courseId: string) => {
+  setLibraryCourses((prev) => toggleDownloadFlag(prev, courseId, false));
+};
+
 
   const toggleOffline = () => {
     // Manual toggle for simulation/testing
@@ -175,15 +251,38 @@ export default function App() {
     setIsOffline(!isOffline);
   };
 
-  const filteredCourses = courses.filter((c) => {
-    if (isOffline && !c.isDownloaded) return false; // In offline mode, only show downloaded
-    if (filter === "All") return true;
-    if (filter === "Completed") return c.status === CourseStatus.Completed;
-    return c.category === filter;
-  });
+  const filteredCourses = useMemo(() => {
+    return libraryCourses.filter((course) => {
+      if (isOffline && !course.isDownloaded) return false;
+
+      if (
+        search &&
+        !course.title.toLowerCase().includes(search.toLowerCase())
+      ) {
+        return false;
+      }
+
+      if (filter === "COMPLETED") {
+        return course.progress === 100;
+      }
+
+      if (filter === "MANDATORY") {
+        return course.category === "Mandatory";
+      }
+
+      if (filter === "RECOMMENDED") {
+        return course.category === "Recommended";
+      }
+
+      return true;
+    });
+  }, [libraryCourses, search, filter, isOffline]);
+
+
 
   const renderLibrary = () => (
     <div className="space-y-6 animate-in fade-in zoom-in duration-300">
+      {/* Search + Filters */}
       <div className="flex flex-col md:flex-row justify-between items-center gap-4">
         <div className="relative w-full md:w-96">
           <Search
@@ -192,28 +291,31 @@ export default function App() {
           />
           <input
             type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
             placeholder="Search courses..."
             className="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
 
         <div className="flex gap-2 overflow-x-auto w-full md:w-auto pb-2 md:pb-0">
-          {["All", "Mandatory", "Recommended", "Completed"].map((f) => (
+          {FILTERS.map(({ label, value }) => (
             <button
-              key={f}
-              onClick={() => setFilter(f as any)}
+              key={value}
+              onClick={() => setFilter(value)}
               className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
-                filter === f
+                filter === value
                   ? "bg-slate-900 text-white"
                   : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
               }`}
             >
-              {f}
+              {label}
             </button>
           ))}
         </div>
       </div>
 
+      {/* Offline Banner */}
       {isOffline && (
         <div className="bg-orange-50 border border-orange-100 text-orange-800 p-4 rounded-xl flex items-center gap-3">
           <Download size={20} />
@@ -223,11 +325,12 @@ export default function App() {
         </div>
       )}
 
+      {/* Course Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredCourses.length > 0 ? (
           filteredCourses.map((course) => (
             <CourseCard
-              key={course.id}
+              key={course.assignmentId ?? course.id}
               course={course}
               onStart={handleStartCourse}
               onDownload={handleDownload}
@@ -251,7 +354,7 @@ export default function App() {
           <h2 className="text-xl font-bold text-slate-800">My Certificates</h2>
         </div>
         <div className="divide-y divide-slate-100">
-          {courses
+          {[...dashboardCourses, ...libraryCourses]
             .filter((c) => c.status === CourseStatus.Completed)
             .map((course) => (
               <div
@@ -277,7 +380,7 @@ export default function App() {
                 </button>
               </div>
             ))}
-          {courses.filter((c) => c.status === CourseStatus.Completed).length ===
+          {[...dashboardCourses, ...libraryCourses].filter((c) => c.status === CourseStatus.Completed).length ===
             0 && (
             <div className="p-12 text-center text-slate-500">
               Complete a course to earn your first certificate!
@@ -354,12 +457,12 @@ export default function App() {
     <>
       {activeCourseId ? (
         <ScormPlayer
-          course={courses.find((c) => c.id === activeCourseId)!}
+          course={[...dashboardCourses, ...libraryCourses].find((c) => c.id === activeCourseId)!}
           onBack={() => setActiveCourseId(null)}
           onUpdateProgress={handleUpdateProgress}
           onViewCertificate={() =>
             setSelectedCertificate(
-              courses.find((c) => c.id === activeCourseId) || null
+              [...dashboardCourses, ...libraryCourses].find((c) => c.id === activeCourseId) || null,
             )
           }
         />
@@ -373,13 +476,13 @@ export default function App() {
           pendingSync={pendingSync}
         >
           {activeView === "dashboard" &&
-            (isDashboardLoading || !stats ? (
+            (isDashboardLoading  ? (
               <div className="p-10 text-center text-slate-500">
                 Loading dashboard…
               </div>
             ) : (
               <Dashboard
-                courses={courses}
+                courses={dashboardCourses}
                 learningPath={learningPath}
                 stats={stats}
                 onStartCourse={handleStartCourse}
@@ -408,3 +511,4 @@ export default function App() {
     </>
   );
 }
+

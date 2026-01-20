@@ -37,7 +37,6 @@ export async function fetchLearnerDashboard(): Promise<LearnerDashboardViewModel
 
   const raw: RawLearnerDashboardPayload = await res.json();
 
-  // 🔁 ADAPT BACKEND → FRONTEND MODEL
   return {
     courses: raw.unfinishedCourses ?? [],
     learningPath: raw.learningPaths?.[0] ?? null,
