@@ -15,6 +15,7 @@ import { fetchLearningPaths } from "@/api/learningPaths";
 import { mapLearningPath } from "@/mappers/learningPathMapper";
 import { fetchAssignedCourses } from "@/api/assignedCourses";
 import { mapAssignedCourse } from "@/mappers/assignedCourseMapper";
+import { syncCourseAttempt } from "./api/attempts";
 
 type LibraryFilter = "ALL" | "MANDATORY" | "RECOMMENDED" | "COMPLETED";
 
@@ -193,36 +194,63 @@ const handleLogout = () => {
 };
 
 
-  const handleStartCourse = (id: string) => {
-    setActiveCourseId(id);
-  };
+const handleStartCourse = async (id: string) => {
+  try {
+    const attempt = await syncCourseAttempt(id, 0);
 
- const handleUpdateProgress = (
+    const percentage = attempt.completionPercentage ?? 0;
+
+    setDashboardCourses(prev =>
+      updateCourseProgress(
+        prev,
+        id,
+        percentage,
+        Math.round((percentage / 100) * 10)
+      )
+    );
+
+    setLibraryCourses(prev =>
+      updateCourseProgress(
+        prev,
+        id,
+        percentage,
+        Math.round((percentage / 100) * 10)
+      )
+    );
+  } catch (err) {
+    console.error("Failed to init attempt", err);
+  }
+
+  setActiveCourseId(id);
+};
+
+
+
+const handleUpdateProgress = async (
   courseId: string,
   progress: number,
   completedModules: number
 ) => {
-  setDashboardCourses((prev) =>
+  setDashboardCourses(prev =>
     updateCourseProgress(prev, courseId, progress, completedModules)
   );
 
-  setLibraryCourses((prev) =>
+  setLibraryCourses(prev =>
     updateCourseProgress(prev, courseId, progress, completedModules)
   );
 
-  setStats((prev) => {
-    if (!prev) return prev;
-    return {
-      ...prev,
-      totalLearningHours: prev.totalLearningHours + 0.1,
-      bicmasCoins: prev.bicmasCoins + 10,
-    };
-  });
+  try {
+    await syncCourseAttempt(courseId, progress);
+  } catch {
+    setPendingSync(1);
+  }
 
-  if (isOffline) {
-    setPendingSync(1); // clamp instead of infinite increment
+  if (progress === 100) {
+    const dashboard = await fetchLearnerDashboard();
+    setStats(dashboard.stats);
   }
 };
+
 
 
 const toggleDownloadFlag = (

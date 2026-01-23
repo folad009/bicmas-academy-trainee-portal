@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { getGeminiResponse } from "../services/geminiService";
 import { mapCourseToPlayerModules } from "@/mappers/mapCourseToPlayerModules";
+import { fetchScormLaunchUrl } from "@/api/scorm";
 
 interface ScormPlayerProps {
   course: Course;
@@ -53,6 +54,8 @@ export const ScormPlayer: React.FC<ScormPlayerProps> = ({
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(100); // Simulated duration in seconds
   const playerIntervalRef = useRef<number | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   // AI Chat State
   const [aiInput, setAiInput] = useState("");
@@ -65,6 +68,8 @@ export const ScormPlayer: React.FC<ScormPlayerProps> = ({
     },
   ]);
   const [isThinking, setIsThinking] = useState(false);
+
+  const [launchUrl, setLaunchUrl] = useState<string | null>(null);
 
   // Initialize duration based on module string (mock logic)
   useEffect(() => {
@@ -118,6 +123,8 @@ export const ScormPlayer: React.FC<ScormPlayerProps> = ({
     return !currentModules[index - 1].isCompleted;
   };
 
+  const activeLesson = modules[activeModuleIndex]?.lessons[activeLessonIndex];
+
   // 1. Load progress
   useEffect(() => {
     const savedState = localStorage.getItem(`scorm_progress_${course.id}`);
@@ -161,43 +168,102 @@ export const ScormPlayer: React.FC<ScormPlayerProps> = ({
     );
   }, [activeModuleIndex, modules, isCourseCompleted, course.id]);
 
-const handleMarkLessonComplete = () => {
-  setModules((prev) =>
-    prev.map((m, mi) => {
-      if (mi !== activeModuleIndex) return m;
+  useEffect(() => {
+    if (!activeLesson?.scormPackageId) {
+      console.error("Lesson has no SCORM package", activeLesson);
+      setLoading(false);
+      return;
+    }
 
-      const updatedLessons = m.lessons.map((l, li) =>
-        li === activeLessonIndex ? { ...l, isCompleted: true } : l
-      );
+    const loadScorm = async () => {
+      try {
+        setLoading(true);
+        const { launchUrl } = await fetchScormLaunchUrl(
+          activeLesson.scormPackageId,
+        );
+        setLaunchUrl(launchUrl);
+      } catch (e) {
+        console.error(e);
+        setError("Failed to load SCORM package");
+      } finally {
+        setLoading(false);
+      }
+    };
 
-      const isModuleCompleted = updatedLessons.every(
-        (l) => l.isCompleted
-      );
+    loadScorm();
+  }, [activeLessonIndex, activeModuleIndex]);
 
-      return {
-        ...m,
-        lessons: updatedLessons,
-        isCompleted: isModuleCompleted,
-      };
-    })
+  useEffect(() => {
+    const handler = (event: MessageEvent) => {
+      if (!event.data?.type) return;
+
+      if (event.data.type === "SCORM_PROGESS") {
+        onUpdateProgress(course.id, event.data.progress);
+      }
+
+      if (event.data.type === "SCORM_COMPLETED") {
+        onUpdateProgress(course.id, 100);
+      }
+    };
+
+    window.addEventListener("message", handler);
+    return () => window.removeEventListener("message", handler);
+  }, [course.id, onUpdateProgress]);
+
+  useEffect(() => {
+    if (!course.scormPackage?.id) {
+      console.error("Course has no SCORM package", course);
+      setError("This course has no SCORM content.");
+      setLoading(false);
+      return;
+    }
+
+    const loadScorm = async () => {
+      try {
+        const { launchUrl } = await fetchScormLaunchUrl(course.scormPackage.id);
+        setLaunchUrl(launchUrl);
+      } catch (e) {
+        console.error(e);
+        setError("Failed to load SCORM package");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadScorm();
+  }, [course]);
+
+  const handleMarkLessonComplete = () => {
+    setModules((prev) =>
+      prev.map((m, mi) => {
+        if (mi !== activeModuleIndex) return m;
+
+        const updatedLessons = m.lessons.map((l, li) =>
+          li === activeLessonIndex ? { ...l, isCompleted: true } : l,
+        );
+
+        const isModuleCompleted = updatedLessons.every((l) => l.isCompleted);
+
+        return {
+          ...m,
+          lessons: updatedLessons,
+          isCompleted: isModuleCompleted,
+        };
+      }),
+    );
+  };
+
+  const totalLessons = modules.reduce((sum, m) => sum + m.lessons.length, 0);
+
+  const completedLessons = modules.reduce(
+    (sum, m) => sum + m.lessons.filter((l) => l.isCompleted).length,
+    0,
   );
-};
-
-const totalLessons = modules.reduce(
-  (sum, m) => sum + m.lessons.length,
-  0
-);
-
-
- const completedLessons = modules.reduce(
-  (sum, m) => sum + m.lessons.filter((l) => l.isCompleted).length,
-  0
-);
 
   const progress =
-  totalLessons === 0
-    ? 0
-    : Math.round((completedLessons / totalLessons) * 100);
+    totalLessons === 0
+      ? 0
+      : Math.round((completedLessons / totalLessons) * 100);
 
   useEffect(() => {
     if (lastReportedProgress.current === progress) return;
@@ -229,8 +295,6 @@ const totalLessons = modules.reduce(
       setIsCourseCompleted(false);
     }
   };
-
-
 
   const handleAiSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -429,12 +493,28 @@ const totalLessons = modules.reduce(
 
               {/* Simulated Media Player with Seek Bar */}
               <div className="bg-slate-900 rounded-xl overflow-hidden shadow-xl mb-8 group">
+                <div className="h-screen w-screen bg-black">
+                  {loading ? (
+                    <div className="flex items-center justify-center h-full text-white">
+                      Loading SCORM lesson...
+                    </div>
+                  ) : (
+                    <iframe
+                      key={launchUrl} // forces reload on lesson change
+                      src={launchUrl!}
+                      className="w-full h-[400px] border-0"
+                      allow="autoplay; fullscreen"
+                    />
+                  )}
+                </div>
+
+                {/* Big Play Button Overlay 
                 <div className="aspect-video bg-slate-800 relative flex items-center justify-center">
-                  {/* Placeholder Visuals */}
+                  
                   <div className="absolute inset-0 opacity-20 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]"></div>
                   <PlayCircleAnimation isPlaying={isPlaying} />
 
-                  {/* Big Play Button Overlay */}
+                  
                   {!isPlaying && (
                     <button
                       onClick={() => setIsPlaying(true)}
@@ -449,7 +529,7 @@ const totalLessons = modules.reduce(
                       </div>
                     </button>
                   )}
-                </div>
+                </div>*/}
 
                 {/* Player Controls */}
                 <div className="bg-slate-900 p-4 text-white">

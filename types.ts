@@ -20,14 +20,14 @@ export interface Course {
   title: string;
   description: string;
   thumbnail: string;
-  category: 'Mandatory' | 'Recommended' | 'Optional';
+  category: "Mandatory" | "Recommended" | "Optional";
   status: CourseStatus;
-  progress: number; // 0 to 100
+  progress: number;
   totalModules: number;
   completedModules: number;
   deadline?: string;
   isDownloaded: boolean;
-  modules: ScormModule[];
+  modules: PlayerModule[];
   certificateUrl?: string;
 }
 
@@ -147,4 +147,12 @@ export interface PlayerModule {
   id: string;
   title: string;
   lessons: PlayerLesson[];
+}
+
+export interface ScormLaunchResponse {
+  launchUrl: string;
+}
+
+export interface ScormManifestResponse {
+  manifest: any; // You rarely need to parse this on frontend
 }
