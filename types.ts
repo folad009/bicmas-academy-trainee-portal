@@ -139,13 +139,15 @@ export interface AssignedCourse {
 export interface PlayerLesson {
   id: string;
   title: string;
-  scormPackageId: string;
+  scormPackageId: string | null;
   isCompleted: boolean;
 }
 
 export interface PlayerModule {
   id: string;
   title: string;
+  duration: string;
+  isCompleted: boolean;
   lessons: PlayerLesson[];
 }
 

@@ -168,30 +168,33 @@ export const ScormPlayer: React.FC<ScormPlayerProps> = ({
     );
   }, [activeModuleIndex, modules, isCourseCompleted, course.id]);
 
-  useEffect(() => {
-    if (!activeLesson?.scormPackageId) {
-      console.error("Lesson has no SCORM package", activeLesson);
+ useEffect(() => {
+  if (!activeLesson) return; // first render guard
+
+  if (!activeLesson.scormPackageId) {
+    setError("This lesson has no SCORM content.");
+    setLoading(false);
+    return;
+  }
+
+  const loadScorm = async () => {
+    try {
+      setLoading(true);
+      const { launchUrl } = await fetchScormLaunchUrl(
+        activeLesson.scormPackageId,
+      );
+      setLaunchUrl(launchUrl);
+    } catch (e) {
+      console.error(e);
+      setError("Failed to load SCORM package");
+    } finally {
       setLoading(false);
-      return;
     }
+  };
 
-    const loadScorm = async () => {
-      try {
-        setLoading(true);
-        const { launchUrl } = await fetchScormLaunchUrl(
-          activeLesson.scormPackageId,
-        );
-        setLaunchUrl(launchUrl);
-      } catch (e) {
-        console.error(e);
-        setError("Failed to load SCORM package");
-      } finally {
-        setLoading(false);
-      }
-    };
+  loadScorm();
+}, [activeLesson]);
 
-    loadScorm();
-  }, [activeLessonIndex, activeModuleIndex]);
 
   useEffect(() => {
     const handler = (event: MessageEvent) => {
@@ -209,29 +212,6 @@ export const ScormPlayer: React.FC<ScormPlayerProps> = ({
     window.addEventListener("message", handler);
     return () => window.removeEventListener("message", handler);
   }, [course.id, onUpdateProgress]);
-
-  useEffect(() => {
-    if (!course.scormPackage?.id) {
-      console.error("Course has no SCORM package", course);
-      setError("This course has no SCORM content.");
-      setLoading(false);
-      return;
-    }
-
-    const loadScorm = async () => {
-      try {
-        const { launchUrl } = await fetchScormLaunchUrl(course.scormPackage.id);
-        setLaunchUrl(launchUrl);
-      } catch (e) {
-        console.error(e);
-        setError("Failed to load SCORM package");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadScorm();
-  }, [course]);
 
   const handleMarkLessonComplete = () => {
     setModules((prev) =>
