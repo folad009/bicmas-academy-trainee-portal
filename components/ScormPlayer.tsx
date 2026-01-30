@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Course, ScormModule, PlayerModule } from "../types";
+import { Course, PlayerModule } from "../types";
 import {
   ChevronLeft,
   ChevronRight,
@@ -10,13 +10,7 @@ import {
   Lock,
   Award,
   Download,
-  Play,
-  Pause,
-  RotateCcw,
-  Volume2,
-  Maximize,
 } from "lucide-react";
-import { getGeminiResponse } from "../services/geminiService";
 import { mapCourseToPlayerModules } from "@/mappers/mapCourseToPlayerModules";
 import { fetchScormLaunchUrl } from "@/api/scorm";
 
@@ -26,7 +20,7 @@ interface ScormPlayerProps {
   onUpdateProgress: (
     courseId: string,
     progress: number,
-    completedModules: number,
+    completedModules: number
   ) => void;
   onViewCertificate: () => void;
 }
@@ -38,180 +32,62 @@ export const ScormPlayer: React.FC<ScormPlayerProps> = ({
   onViewCertificate,
 }) => {
   const [modules, setModules] = useState<PlayerModule[]>(
-    mapCourseToPlayerModules(course),
+    mapCourseToPlayerModules(course)
   );
   const [activeModuleIndex, setActiveModuleIndex] = useState(0);
   const [activeLessonIndex, setActiveLessonIndex] = useState(0);
   const activeModule = modules[activeModuleIndex];
-  const lastReportedProgress = useRef<number | null>(null);
+  const activeLesson = activeModule?.lessons[activeLessonIndex];
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [showAiChat, setShowAiChat] = useState(false);
   const [isCourseCompleted, setIsCourseCompleted] = useState(false);
 
-  // Media Player State
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(100); // Simulated duration in seconds
-  const playerIntervalRef = useRef<number | null>(null);
+  const [launchUrl, setLaunchUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // AI Chat State
-  const [aiInput, setAiInput] = useState("");
-  const [aiMessages, setAiMessages] = useState<
-    { role: "user" | "model"; text: string }[]
-  >([
-    {
-      role: "model",
-      text: `Hi! I'm your BICMAS AI Tutor. I can help you with "${course.title}". Ask me anything!`,
-    },
-  ]);
-  const [isThinking, setIsThinking] = useState(false);
+  const lastReportedProgress = useRef<number | null>(null);
 
-  const [launchUrl, setLaunchUrl] = useState<string | null>(null);
-
-  // Initialize duration based on module string (mock logic)
+  // Load SCORM
   useEffect(() => {
-    const durationStr = modules[activeModuleIndex].duration;
-    const mins = parseInt(durationStr) || 5;
-    setDuration(mins * 60);
-    setCurrentTime(0);
-    setIsPlaying(false);
-    if (playerIntervalRef.current)
-      window.clearInterval(playerIntervalRef.current);
-  }, [activeModuleIndex]);
+    if (!activeLesson) return;
 
-  // Player Timer Logic
-  useEffect(() => {
-    if (isPlaying) {
-      playerIntervalRef.current = window.setInterval(() => {
-        setCurrentTime((prev) => {
-          if (prev >= duration) {
-            setIsPlaying(false);
-            // Auto-complete module when media finishes
-            if (!modules[activeModuleIndex].isCompleted) {
-              handleMarkLessonComplete();
-            }
-            return duration;
-          }
-          return prev + 1;
-        });
-      }, 1000); // 1x speed simulation
-    } else {
-      if (playerIntervalRef.current)
-        window.clearInterval(playerIntervalRef.current);
-    }
-    return () => {
-      if (playerIntervalRef.current)
-        window.clearInterval(playerIntervalRef.current);
-    };
-  }, [isPlaying, duration, activeModuleIndex, modules]);
-
-  const formatTime = (seconds: number) => {
-    const m = Math.floor(seconds / 60);
-    const s = Math.floor(seconds % 60);
-    return `${m}:${s.toString().padStart(2, "0")}`;
-  };
-
-  const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setCurrentTime(Number(e.target.value));
-  };
-
-  const isModuleLocked = (index: number, currentModules: ScormModule[]) => {
-    if (index === 0) return false;
-    return !currentModules[index - 1].isCompleted;
-  };
-
-  const activeLesson = modules[activeModuleIndex]?.lessons[activeLessonIndex];
-
-  // 1. Load progress
-  useEffect(() => {
-    const savedState = localStorage.getItem(`scorm_progress_${course.id}`);
-    if (savedState) {
+    const load = async () => {
       try {
-        const { index, savedModules, completed } = JSON.parse(savedState);
-        const mergedModules = course.modules.map((m, i) => ({
-          ...m,
-          isCompleted: savedModules[i]?.isCompleted || m.isCompleted,
-        }));
-        setModules(mergedModules);
-
-        let validIndex = index;
-        if (validIndex > 0 && isModuleLocked(validIndex, mergedModules)) {
-          const firstLocked = mergedModules.findIndex((_, idx) =>
-            isModuleLocked(idx, mergedModules),
-          );
-          validIndex =
-            firstLocked !== -1
-              ? Math.max(0, firstLocked - 1)
-              : mergedModules.length - 1;
-        }
-        setActiveModuleIndex(validIndex);
-        setIsCourseCompleted(completed);
-      } catch (e) {
-        console.error("Failed to restore course progress", e);
+        setLoading(true);
+        setError(null);
+        const { launchUrl } = await fetchScormLaunchUrl(
+          activeLesson.scormPackageId
+        );
+        setLaunchUrl(launchUrl);
+      } catch {
+        setError("Failed to load SCORM package");
+      } finally {
+        setLoading(false);
       }
-    }
-  }, [course.id]);
-
-  // 2. Save progress
-  useEffect(() => {
-    const stateToSave = {
-      index: activeModuleIndex,
-      savedModules: modules,
-      completed: isCourseCompleted,
     };
-    localStorage.setItem(
-      `scorm_progress_${course.id}`,
-      JSON.stringify(stateToSave),
-    );
-  }, [activeModuleIndex, modules, isCourseCompleted, course.id]);
 
- useEffect(() => {
-  if (!activeLesson) return; // first render guard
+    load();
+  }, [activeLesson]);
 
-  if (!activeLesson.scormPackageId) {
-    setError("This lesson has no SCORM content.");
-    setLoading(false);
-    return;
-  }
-
-  const loadScorm = async () => {
-    try {
-      setLoading(true);
-      const { launchUrl } = await fetchScormLaunchUrl(
-        activeLesson.scormPackageId,
-      );
-      setLaunchUrl(launchUrl);
-    } catch (e) {
-      console.error(e);
-      setError("Failed to load SCORM package");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  loadScorm();
-}, [activeLesson]);
-
-
+  // Listen to SCORM messages
   useEffect(() => {
     const handler = (event: MessageEvent) => {
       if (!event.data?.type) return;
 
-      if (event.data.type === "SCORM_PROGESS") {
-        onUpdateProgress(course.id, event.data.progress);
+      if (event.data.type === "SCORM_PROGRESS") {
+        onUpdateProgress(course.id, event.data.progress, 0);
       }
 
       if (event.data.type === "SCORM_COMPLETED") {
-        onUpdateProgress(course.id, 100);
+        handleMarkLessonComplete();
       }
     };
 
     window.addEventListener("message", handler);
     return () => window.removeEventListener("message", handler);
-  }, [course.id, onUpdateProgress]);
+  }, [course.id]);
 
   const handleMarkLessonComplete = () => {
     setModules((prev) =>
@@ -219,25 +95,25 @@ export const ScormPlayer: React.FC<ScormPlayerProps> = ({
         if (mi !== activeModuleIndex) return m;
 
         const updatedLessons = m.lessons.map((l, li) =>
-          li === activeLessonIndex ? { ...l, isCompleted: true } : l,
+          li === activeLessonIndex ? { ...l, isCompleted: true } : l
         );
-
-        const isModuleCompleted = updatedLessons.every((l) => l.isCompleted);
 
         return {
           ...m,
           lessons: updatedLessons,
-          isCompleted: isModuleCompleted,
+          isCompleted: updatedLessons.every((l) => l.isCompleted),
         };
-      }),
+      })
     );
   };
 
-  const totalLessons = modules.reduce((sum, m) => sum + m.lessons.length, 0);
-
+  const totalLessons = modules.reduce(
+    (sum, m) => sum + m.lessons.length,
+    0
+  );
   const completedLessons = modules.reduce(
     (sum, m) => sum + m.lessons.filter((l) => l.isCompleted).length,
-    0,
+    0
   );
 
   const progress =
@@ -247,14 +123,11 @@ export const ScormPlayer: React.FC<ScormPlayerProps> = ({
 
   useEffect(() => {
     if (lastReportedProgress.current === progress) return;
-
     lastReportedProgress.current = progress;
-    onUpdateProgress(course.id, progress, completedLessons + 1);
-  }, [course.id, progress, completedLessons, onUpdateProgress]);
+    onUpdateProgress(course.id, progress, completedLessons);
+  }, [progress]);
 
   const handleNext = () => {
-    handleMarkLessonComplete();
-
     if (activeLessonIndex < activeModule.lessons.length - 1) {
       setActiveLessonIndex((i) => i + 1);
       return;
@@ -269,77 +142,27 @@ export const ScormPlayer: React.FC<ScormPlayerProps> = ({
     setIsCourseCompleted(true);
   };
 
-  const handlePrev = () => {
-    if (activeModuleIndex > 0) {
-      setActiveModuleIndex((prev) => prev - 1);
-      setIsCourseCompleted(false);
-    }
-  };
-
-  const handleAiSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!aiInput.trim()) return;
-
-    const userMsg = aiInput;
-    setAiMessages((prev) => [...prev, { role: "user", text: userMsg }]);
-    setAiInput("");
-    setIsThinking(true);
-
-    const context = `Course: ${course.title}. Module: ${activeModule?.title || "Summary"}. Content: ${activeModule?.content || "Course Completed"}`;
-    const response = await getGeminiResponse(userMsg, context);
-
-    setIsThinking(false);
-    setAiMessages((prev) => [...prev, { role: "model", text: response }]);
-  };
-
   if (isCourseCompleted) {
     return (
-      <div className="fixed inset-0 z-50 bg-slate-50 flex flex-col h-screen w-screen overflow-hidden">
-        <header className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between shrink-0">
-          <button
-            onClick={onBack}
-            className="flex items-center gap-2 text-slate-600 hover:text-slate-900 font-medium"
-          >
-            <ChevronLeft size={20} /> Back to Dashboard
+      <div className="fixed inset-0 bg-slate-50 flex flex-col">
+        <header className="bg-white border-b px-6 py-4 flex justify-between">
+          <button onClick={onBack}>
+            <ChevronLeft size={20} /> Back
           </button>
-          <div className="font-semibold text-slate-800">{course.title}</div>
-          <div className="w-8"></div>
+          <div>{course.title}</div>
+          <div />
         </header>
 
-        <main className="flex-1 flex flex-col items-center justify-center p-6 animate-in zoom-in duration-500">
-          <div className="bg-white max-w-2xl w-full rounded-2xl shadow-xl border border-slate-100 overflow-hidden text-center p-12">
-            <div className="w-24 h-24 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-8 animate-bounce">
-              <Award size={48} />
-            </div>
-
-            <h1 className="text-3xl md:text-4xl font-bold text-slate-900 mb-4">
-              Congratulations!
-            </h1>
-            <p className="text-lg text-slate-600 mb-8">
-              You have successfully completed <br />
-              <span className="font-bold text-slate-800">"{course.title}"</span>
-            </p>
-
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <button
-                onClick={onViewCertificate}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-transform hover:scale-105 shadow-lg shadow-blue-200"
-              >
-                <Download size={20} /> Download Certificate
-              </button>
-            </div>
-
-            <div className="mt-8 pt-8 border-t border-slate-100">
-              <button
-                onClick={() => {
-                  setActiveModuleIndex(0);
-                  setIsCourseCompleted(false);
-                }}
-                className="text-sm text-slate-400 hover:text-blue-600"
-              >
-                Review Course Content
-              </button>
-            </div>
+        <main className="flex-1 flex items-center justify-center">
+          <div className="bg-white p-12 rounded-xl shadow text-center">
+            <Award size={64} className="mx-auto mb-6 text-green-600" />
+            <h1 className="text-3xl font-bold mb-4">Course completed</h1>
+            <button
+              onClick={onViewCertificate}
+              className="bg-blue-600 text-white px-6 py-3 rounded"
+            >
+              <Download size={18} /> Certificate
+            </button>
           </div>
         </main>
       </div>
@@ -347,359 +170,75 @@ export const ScormPlayer: React.FC<ScormPlayerProps> = ({
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-white flex flex-col h-screen w-screen">
-      <header className="bg-slate-900 text-white px-4 py-3 flex items-center justify-between shrink-0">
-        <div className="flex items-center gap-4">
-          <button
-            onClick={onBack}
-            className="hover:bg-slate-800 p-2 rounded-full transition-colors"
-          >
-            <X size={20} />
-          </button>
-          <div className="flex flex-col">
-            <h1 className="text-sm font-medium text-slate-300 uppercase tracking-wider">
-              BICMAS Player
-            </h1>
-            <span className="font-semibold text-lg leading-none">
-              {course.title}
-            </span>
-          </div>
-        </div>
-        <div className="flex items-center gap-3">
-          <div className="hidden sm:block text-right">
-            <div className="text-xs text-slate-400">Total Progress</div>
-            <div className="font-mono text-emerald-400">
-              {Math.round(
-                (modules.filter((m) => m.isCompleted).length / modules.length) *
-                  100,
-              )}
-              %
-            </div>
-          </div>
-          <button
-            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-            className="p-2 hover:bg-slate-800 rounded-lg sm:hidden"
-          >
-            <Menu size={20} />
-          </button>
-        </div>
+    <div className="fixed inset-0 flex flex-col">
+      <header className="bg-slate-900 text-white px-4 py-3 flex justify-between">
+        <button onClick={onBack}>
+          <X size={20} />
+        </button>
+        <div>{course.title}</div>
+        <button onClick={() => setIsSidebarOpen(!isSidebarOpen)}>
+          <Menu size={20} />
+        </button>
       </header>
 
-      <div className="flex-1 flex overflow-hidden">
-        <aside
-          className={`${isSidebarOpen ? "w-80 translate-x-0" : "w-0 -translate-x-full opacity-0"} transition-all duration-300 bg-slate-50 border-r border-slate-200 flex flex-col shrink-0 absolute sm:relative z-20 h-full shadow-xl sm:shadow-none`}
-        >
-          <div className="p-4 border-b border-slate-200">
-            <h2 className="font-semibold text-slate-700">Course Modules</h2>
-          </div>
-          <div className="overflow-y-auto flex-1 p-2 space-y-1">
-            {modules.map((module, moduleIdx) => {
-              const isModuleActive = moduleIdx === activeModuleIndex;
+      <div className="flex flex-1 overflow-hidden">
+        <aside className={`w-80 border-r ${!isSidebarOpen && "hidden"}`}>
+          {modules.map((m, mi) => (
+            <div key={m.id}>
+              <div className="font-semibold px-3 py-2">{m.title}</div>
+              {m.lessons.map((l, li) => {
+                const locked =
+                  mi > activeModuleIndex ||
+                  (mi === activeModuleIndex &&
+                    li > activeLessonIndex);
 
-              return (
-                <div key={module.id} className="space-y-1">
-                  {/* Module header */}
-                  <div className="px-3 py-2 text-sm font-semibold text-slate-700">
-                    {module.title}
-                  </div>
-
-                  {/* Lessons */}
-                  {module.lessons.map((lesson, lessonIdx) => {
-                    const isActive =
-                      moduleIdx === activeModuleIndex &&
-                      lessonIdx === activeLessonIndex;
-
-                    const isLocked =
-                      moduleIdx > activeModuleIndex ||
-                      (moduleIdx === activeModuleIndex &&
-                        lessonIdx > activeLessonIndex);
-
-                    return (
-                      <button
-                        key={lesson.id}
-                        onClick={() => {
-                          if (isLocked) return;
-                          setActiveModuleIndex(moduleIdx);
-                          setActiveLessonIndex(lessonIdx);
-                        }}
-                        disabled={isLocked}
-                        className={`w-full text-left px-6 py-2 rounded-md text-sm flex items-center gap-3 transition-colors ${
-                          isActive
-                            ? "bg-blue-50 text-blue-700"
-                            : isLocked
-                              ? "opacity-50 cursor-not-allowed"
-                              : "hover:bg-slate-100 text-slate-600"
-                        }`}
-                      >
-                        {/* Status icon */}
-                        <div className="shrink-0">
-                          {lesson.isCompleted ? (
-                            <CheckCircle size={16} className="text-green-500" />
-                          ) : isLocked ? (
-                            <Lock size={16} className="text-slate-400" />
-                          ) : (
-                            <div
-                              className={`w-3 h-3 rounded-full border-2 ${
-                                isActive
-                                  ? "border-blue-500"
-                                  : "border-slate-300"
-                              }`}
-                            />
-                          )}
-                        </div>
-
-                        {/* Lesson title */}
-                        <span className="leading-tight">{lesson.title}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              );
-            })}
-          </div>
+                return (
+                  <button
+                    key={l.id}
+                    disabled={locked}
+                    onClick={() => {
+                      setActiveModuleIndex(mi);
+                      setActiveLessonIndex(li);
+                    }}
+                    className="block w-full text-left px-6 py-2 disabled:opacity-40"
+                  >
+                    {l.isCompleted ? "✔" : locked ? "🔒" : "•"} {l.title}
+                  </button>
+                );
+              })}
+            </div>
+          ))}
         </aside>
 
-        <main className="flex-1 bg-white relative overflow-hidden flex flex-col">
-          <div className="flex-1 overflow-y-auto p-8 max-w-4xl mx-auto w-full">
-            <div className="prose prose-slate max-w-none">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-3xl font-bold text-slate-900 m-0">
-                  {activeModule.title}
-                </h2>
-                <span className="bg-slate-100 text-slate-600 px-3 py-1 rounded-full text-sm font-medium">
-                  Module {activeModuleIndex + 1} of {modules.length}
-                </span>
-              </div>
-
-              {/* Simulated Media Player with Seek Bar */}
-              <div className="bg-slate-900 rounded-xl overflow-hidden shadow-xl mb-8 group">
-                <div className="h-screen w-screen bg-black">
-                  {loading ? (
-                    <div className="flex items-center justify-center h-full text-white">
-                      Loading SCORM lesson...
-                    </div>
-                  ) : (
-                    <iframe
-                      key={launchUrl} // forces reload on lesson change
-                      src={launchUrl!}
-                      className="w-full h-[400px] border-0"
-                      allow="autoplay; fullscreen"
-                    />
-                  )}
-                </div>
-
-                {/* Big Play Button Overlay 
-                <div className="aspect-video bg-slate-800 relative flex items-center justify-center">
-                  
-                  <div className="absolute inset-0 opacity-20 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]"></div>
-                  <PlayCircleAnimation isPlaying={isPlaying} />
-
-                  
-                  {!isPlaying && (
-                    <button
-                      onClick={() => setIsPlaying(true)}
-                      className="absolute inset-0 flex items-center justify-center bg-black/30 group-hover:bg-black/40 transition-colors"
-                    >
-                      <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center pl-1 hover:scale-110 transition-transform shadow-lg">
-                        <Play
-                          size={40}
-                          className="text-slate-900"
-                          fill="currentColor"
-                        />
-                      </div>
-                    </button>
-                  )}
-                </div>*/}
-
-                {/* Player Controls */}
-                <div className="bg-slate-900 p-4 text-white">
-                  {/* Seek Bar */}
-                  <div className="flex items-center gap-4 mb-2">
-                    <span className="text-xs font-mono text-slate-400 w-10 text-right">
-                      {formatTime(currentTime)}
-                    </span>
-                    <div className="flex-1 relative h-2 group/seek">
-                      <div className="absolute inset-0 bg-slate-700 rounded-full"></div>
-                      <div
-                        className="absolute top-0 left-0 h-full bg-blue-500 rounded-full relative"
-                        style={{ width: `${(currentTime / duration) * 100}%` }}
-                      >
-                        <div className="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full shadow opacity-0 group-hover/seek:opacity-100 transition-opacity"></div>
-                      </div>
-                      <input
-                        type="range"
-                        min="0"
-                        max={duration}
-                        value={currentTime}
-                        onChange={handleSeek}
-                        className="absolute inset-0 w-full opacity-0 cursor-pointer"
-                      />
-                    </div>
-                    <span className="text-xs font-mono text-slate-400 w-10">
-                      {formatTime(duration)}
-                    </span>
-                  </div>
-
-                  <div className="flex justify-between items-center">
-                    <div className="flex items-center gap-4">
-                      <button
-                        onClick={() => setIsPlaying(!isPlaying)}
-                        className="hover:text-blue-400 transition-colors"
-                      >
-                        {isPlaying ? (
-                          <Pause size={24} fill="currentColor" />
-                        ) : (
-                          <Play size={24} fill="currentColor" />
-                        )}
-                      </button>
-                      <button
-                        onClick={() => {
-                          setCurrentTime(0);
-                          setIsPlaying(true);
-                        }}
-                        className="hover:text-blue-400 transition-colors text-slate-400"
-                      >
-                        <RotateCcw size={20} />
-                      </button>
-                      <div className="flex items-center gap-2 group/vol">
-                        <Volume2 size={20} className="text-slate-400" />
-                        <div className="w-20 h-1 bg-slate-700 rounded-full overflow-hidden">
-                          <div className="w-3/4 h-full bg-slate-400"></div>
-                        </div>
-                      </div>
-                    </div>
-                    <button className="hover:text-blue-400 transition-colors text-slate-400">
-                      <Maximize size={20} />
-                    </button>
-                  </div>
-                </div>
-              </div>
+        <main className="flex-1 bg-black">
+          {loading && (
+            <div className="h-full flex items-center justify-center text-white">
+              Loading SCORM...
             </div>
-          </div>
+          )}
 
-          <div className="p-4 border-t border-slate-100 bg-white flex justify-between items-center max-w-4xl mx-auto w-full">
-            <button
-              onClick={handlePrev}
-              disabled={activeModuleIndex === 0}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg text-slate-600 hover:bg-slate-50 disabled:opacity-30 disabled:hover:bg-transparent font-medium"
-            >
-              <ChevronLeft size={20} /> Previous Module
-            </button>
+          {error && (
+            <div className="h-full flex items-center justify-center text-red-500">
+              {error}
+            </div>
+          )}
 
-            <button
-              onClick={handleNext}
-              className={`flex items-center gap-2 px-6 py-2 rounded-lg font-medium transition-transform active:scale-95 ${
-                activeModule.isCompleted
-                  ? "bg-blue-600 text-white hover:bg-blue-700 shadow-sm shadow-blue-200"
-                  : "bg-slate-100 text-slate-400 cursor-not-allowed"
-              }`}
-              disabled={!activeModule.isCompleted}
-              title={
-                !activeModule.isCompleted
-                  ? "Complete the module content first"
-                  : ""
-              }
-            >
-              {activeModuleIndex === modules.length - 1
-                ? "Finish & Claim Certificate"
-                : "Next Module"}{" "}
-              <ChevronRight size={20} />
-            </button>
-          </div>
+          {!loading && !error && launchUrl && (
+            <iframe
+              src={launchUrl}
+              className="w-full h-full border-0"
+              allow="autoplay; fullscreen"
+              sandbox="allow-scripts allow-same-origin allow-forms"
+            />
+          )}
         </main>
       </div>
 
-      <div className="fixed bottom-6 right-6 z-30">
-        <button
-          onClick={() => setShowAiChat(!showAiChat)}
-          className="bg-indigo-600 text-white p-4 rounded-full shadow-lg shadow-indigo-300 hover:bg-indigo-700 transition-transform hover:scale-105 flex items-center gap-2"
-        >
-          <Sparkles size={24} />
-          <span className="font-medium pr-1">AI Tutor</span>
+      <footer className="p-4 border-t flex justify-between">
+        <button onClick={handleNext} className="bg-blue-600 text-white px-6 py-2">
+          Next
         </button>
-      </div>
-
-      {showAiChat && (
-        <div className="fixed bottom-24 right-6 w-96 h-[500px] bg-white rounded-2xl shadow-2xl border border-slate-100 flex flex-col z-30 overflow-hidden animate-in slide-in-from-bottom-5 fade-in duration-300">
-          <div className="bg-indigo-600 p-4 text-white flex justify-between items-center">
-            <div className="flex items-center gap-2">
-              <Sparkles size={18} />
-              <span className="font-semibold">BICMAS AI Assistant</span>
-            </div>
-            <button
-              onClick={() => setShowAiChat(false)}
-              className="hover:bg-indigo-500 rounded p-1"
-            >
-              <X size={16} />
-            </button>
-          </div>
-
-          <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50">
-            {aiMessages.map((msg, i) => (
-              <div
-                key={i}
-                className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
-              >
-                <div
-                  className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm ${msg.role === "user" ? "bg-indigo-600 text-white rounded-br-none" : "bg-white border border-slate-200 text-slate-700 rounded-bl-none shadow-sm"}`}
-                >
-                  {msg.text}
-                </div>
-              </div>
-            ))}
-            {isThinking && (
-              <div className="flex justify-start">
-                <div className="bg-white border border-slate-200 rounded-2xl rounded-bl-none px-4 py-3 shadow-sm flex gap-1">
-                  <div
-                    className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce"
-                    style={{ animationDelay: "0ms" }}
-                  ></div>
-                  <div
-                    className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce"
-                    style={{ animationDelay: "150ms" }}
-                  ></div>
-                  <div
-                    className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce"
-                    style={{ animationDelay: "300ms" }}
-                  ></div>
-                </div>
-              </div>
-            )}
-          </div>
-
-          <form
-            onSubmit={handleAiSubmit}
-            className="p-3 border-t border-slate-100 bg-white"
-          >
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={aiInput}
-                onChange={(e) => setAiInput(e.target.value)}
-                placeholder="Ask about this module..."
-                className="flex-1 bg-slate-100 border-0 rounded-xl px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all outline-none text-sm"
-              />
-              <button
-                type="submit"
-                disabled={!aiInput.trim() || isThinking}
-                className="bg-indigo-600 text-white p-2 rounded-xl hover:bg-indigo-700 disabled:opacity-50"
-              >
-                <ChevronRight size={20} />
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
-    </div>
-  );
-};
-
-// Simple visual component for the "video player" background
-const PlayCircleAnimation = ({ isPlaying }: { isPlaying: boolean }) => {
-  if (!isPlaying) return null;
-  return (
-    <div className="absolute inset-0 flex items-center justify-center opacity-10">
-      <div className="w-full h-full bg-gradient-to-tr from-blue-500/20 to-purple-500/20 animate-pulse"></div>
+      </footer>
     </div>
   );
 };

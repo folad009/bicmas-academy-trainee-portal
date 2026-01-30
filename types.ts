@@ -156,5 +156,6 @@ export interface ScormLaunchResponse {
 }
 
 export interface ScormManifestResponse {
-  manifest: any; // You rarely need to parse this on frontend
+  manifest: any;
+  basePath: string;
 }
