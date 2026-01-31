@@ -49,34 +49,3 @@ export const fetchScormLaunchUrl = async (
 
   return res.json();
 };
-
-
-
-
-/**
- * SCORM-compliant launch resolver
- * Uses manifest instead of guessing index.html
- 
-export const fetchScormLaunchUrl = async (
-  scormPackageId: string
-): Promise<{ launchUrl: string }> => {
-  const manifestResponse = await fetchScormManifest(scormPackageId);
-
-  // 1. Extract entry point from manifest
-  const entryPoint =
-    manifestResponse.manifest.resources[0].resource[0].$.href;
-  // e.g. "res/index.html"
-
-  // 2. Backend must provide where the package lives in blob storage
-  const basePath = manifestResponse.basePath;
-  // e.g. "scorm/2026-01-25T20-59-22-605Z-lesson-1"
-
-  if (!entryPoint || !basePath) {
-    throw new Error("Invalid SCORM manifest data");
-  }
-
-  // 3. Construct real launch URL
-  const launchUrl = `https://blob.vercel-storage.com/${basePath}/${entryPoint}`;
-
-  return { launchUrl };
-};*/

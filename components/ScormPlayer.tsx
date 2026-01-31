@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { mapCourseToPlayerModules } from "@/mappers/mapCourseToPlayerModules";
 import { fetchScormLaunchUrl } from "@/api/scorm";
+import { syncCourseAttempt } from "@/api/attempts";
 
 interface ScormPlayerProps {
   course: Course;
@@ -40,7 +41,6 @@ export const ScormPlayer: React.FC<ScormPlayerProps> = ({
   const activeLesson = activeModule?.lessons[activeLessonIndex];
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [showAiChat, setShowAiChat] = useState(false);
   const [isCourseCompleted, setIsCourseCompleted] = useState(false);
 
   const [launchUrl, setLaunchUrl] = useState<string | null>(null);
@@ -122,12 +122,30 @@ export const ScormPlayer: React.FC<ScormPlayerProps> = ({
       : Math.round((completedLessons / totalLessons) * 100);
 
   useEffect(() => {
+    if (course.status === "COMPLETED") return;
+    
     if (lastReportedProgress.current === progress) return;
     lastReportedProgress.current = progress;
+
     onUpdateProgress(course.id, progress, completedLessons);
+
+    syncCourseAttempt(course.id, progress).catch(console.error)
   }, [progress]);
 
+  useEffect(() => {
+    const onUnload = () => {
+      if (lastReportedProgress.current != null) {
+        syncCourseAttempt(course.id, lastReportedProgress.current)
+      }
+    }
+
+    window.addEventListener("beforeunload", onUnload)
+    return () => window.removeEventListener("beforeunload", onUnload)
+  }, [course.id])
+
   const handleNext = () => {
+    handleMarkLessonComplete();
+
     if (activeLessonIndex < activeModule.lessons.length - 1) {
       setActiveLessonIndex((i) => i + 1);
       return;
