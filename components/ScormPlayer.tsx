@@ -21,7 +21,7 @@ interface ScormPlayerProps {
   onUpdateProgress: (
     courseId: string,
     progress: number,
-    completedModules: number
+    completedModules: number,
   ) => void;
   onViewCertificate: () => void;
 }
@@ -33,7 +33,7 @@ export const ScormPlayer: React.FC<ScormPlayerProps> = ({
   onViewCertificate,
 }) => {
   const [modules, setModules] = useState<PlayerModule[]>(
-    mapCourseToPlayerModules(course)
+    mapCourseToPlayerModules(course),
   );
   const [activeModuleIndex, setActiveModuleIndex] = useState(0);
   const [activeLessonIndex, setActiveLessonIndex] = useState(0);
@@ -49,6 +49,31 @@ export const ScormPlayer: React.FC<ScormPlayerProps> = ({
 
   const lastReportedProgress = useRef<number | null>(null);
 
+  const isLessonCompleted = !!activeLesson?.isCompleted;
+
+
+ const { totalLessons, completedLessons, progress } = React.useMemo(() => {
+  const total = modules.reduce(
+    (sum, m) => sum + m.lessons.length,
+    0
+  );
+
+  const completed = modules.reduce(
+    (sum, m) => sum + m.lessons.filter((l) => l.isCompleted).length,
+    0
+  );
+
+  const pct = total ? Math.round((completed / total) * 100) : 0;
+
+  return {
+    totalLessons: total,
+    completedLessons: completed,
+    progress: pct,
+  };
+}, [modules]);
+
+
+
   // Load SCORM
   useEffect(() => {
     if (!activeLesson) return;
@@ -58,7 +83,7 @@ export const ScormPlayer: React.FC<ScormPlayerProps> = ({
         setLoading(true);
         setError(null);
         const { launchUrl } = await fetchScormLaunchUrl(
-          activeLesson.scormPackageId
+          activeLesson.scormPackageId,
         );
         setLaunchUrl(launchUrl);
       } catch {
@@ -71,14 +96,28 @@ export const ScormPlayer: React.FC<ScormPlayerProps> = ({
     load();
   }, [activeLesson]);
 
+  const handleMarkLessonComplete = () => {
+    setModules((prev) =>
+      prev.map((m, mi) => {
+        if (mi !== activeModuleIndex) return m;
+
+        const updatedLessons = m.lessons.map((l, li) =>
+          li === activeLessonIndex ? { ...l, isCompleted: true } : l,
+        );
+
+        return {
+          ...m,
+          lessons: updatedLessons,
+          isCompleted: updatedLessons.every((l) => l.isCompleted),
+        };
+      }),
+    );
+  };
+
   // Listen to SCORM messages
   useEffect(() => {
     const handler = (event: MessageEvent) => {
       if (!event.data?.type) return;
-
-      if (event.data.type === "SCORM_PROGRESS") {
-        onUpdateProgress(course.id, event.data.progress, 0);
-      }
 
       if (event.data.type === "SCORM_COMPLETED") {
         handleMarkLessonComplete();
@@ -87,64 +126,58 @@ export const ScormPlayer: React.FC<ScormPlayerProps> = ({
 
     window.addEventListener("message", handler);
     return () => window.removeEventListener("message", handler);
-  }, [course.id]);
-
-  const handleMarkLessonComplete = () => {
-    setModules((prev) =>
-      prev.map((m, mi) => {
-        if (mi !== activeModuleIndex) return m;
-
-        const updatedLessons = m.lessons.map((l, li) =>
-          li === activeLessonIndex ? { ...l, isCompleted: true } : l
-        );
-
-        return {
-          ...m,
-          lessons: updatedLessons,
-          isCompleted: updatedLessons.every((l) => l.isCompleted),
-        };
-      })
-    );
-  };
-
-  const totalLessons = modules.reduce(
-    (sum, m) => sum + m.lessons.length,
-    0
-  );
-  const completedLessons = modules.reduce(
-    (sum, m) => sum + m.lessons.filter((l) => l.isCompleted).length,
-    0
-  );
-
-  const progress =
-    totalLessons === 0
-      ? 0
-      : Math.round((completedLessons / totalLessons) * 100);
+  }, [activeModuleIndex, activeLessonIndex]);
 
   useEffect(() => {
     if (course.status === "COMPLETED") return;
-    
+
     if (lastReportedProgress.current === progress) return;
     lastReportedProgress.current = progress;
 
     onUpdateProgress(course.id, progress, completedLessons);
 
-    syncCourseAttempt(course.id, progress).catch(console.error)
-  }, [progress]);
+    syncCourseAttempt(course.id, progress).catch(console.error);
+  }, [progress, completedLessons]);
 
   useEffect(() => {
     const onUnload = () => {
       if (lastReportedProgress.current != null) {
-        syncCourseAttempt(course.id, lastReportedProgress.current)
+        syncCourseAttempt(course.id, lastReportedProgress.current);
       }
+    };
+
+    window.addEventListener("beforeunload", onUnload);
+    return () => window.removeEventListener("beforeunload", onUnload);
+  }, [course.id]);
+
+  useEffect(() => {
+  if (progress === 100) {
+    setIsCourseCompleted(true);
+  }
+}, [progress]);
+
+  const canGoNext = isLessonCompleted;
+  const canGoPrev =
+    isLessonCompleted && (activeLessonIndex > 0 || activeModuleIndex > 0);
+
+  const handlePrev = () => {
+    if (!canGoPrev) return;
+
+    if (activeLessonIndex > 0) {
+      setActiveLessonIndex((i) => i - 1);
+      return;
     }
 
-    window.addEventListener("beforeunload", onUnload)
-    return () => window.removeEventListener("beforeunload", onUnload)
-  }, [course.id])
+    if (activeModuleIndex > 0) {
+      const prevModuleIndex = activeModuleIndex - 1;
+      const prevModule = modules[prevModuleIndex];
+      setActiveModuleIndex(prevModuleIndex);
+      setActiveLessonIndex(prevModule.lessons.length - 1);
+    }
+  };
 
   const handleNext = () => {
-    handleMarkLessonComplete();
+    if (!canGoNext) return;
 
     if (activeLessonIndex < activeModule.lessons.length - 1) {
       setActiveLessonIndex((i) => i + 1);
@@ -207,8 +240,7 @@ export const ScormPlayer: React.FC<ScormPlayerProps> = ({
               {m.lessons.map((l, li) => {
                 const locked =
                   mi > activeModuleIndex ||
-                  (mi === activeModuleIndex &&
-                    li > activeLessonIndex);
+                  (mi === activeModuleIndex && li > activeLessonIndex);
 
                 return (
                   <button
@@ -253,9 +285,34 @@ export const ScormPlayer: React.FC<ScormPlayerProps> = ({
       </div>
 
       <footer className="p-4 border-t flex justify-between">
-        <button onClick={handleNext} className="bg-blue-600 text-white px-6 py-2">
-          Next
-        </button>
+        {!isLessonCompleted && (
+          <button
+            onClick={handleMarkLessonComplete}
+            className="px-6 py-2 rounded bg-green-600 text-white flex items-center gap-2"
+          >
+            <CheckCircle size={18} />
+            Mark as complete
+          </button>
+        )}
+
+        {isLessonCompleted && (
+          <div className="flex gap-2">
+            <button
+              onClick={handlePrev}
+              disabled={!canGoPrev}
+              className="px-6 py-2 rounded bg-gray-600 text-white disabled:opacity-40"
+            >
+              Previous
+            </button>
+
+            <button
+              onClick={handleNext}
+              className="px-6 py-2 rounded bg-blue-600 text-white"
+            >
+              {progress === 100 ? "Complete Course" : "Next Lesson"}
+            </button>
+          </div>
+        )}
       </footer>
     </div>
   );

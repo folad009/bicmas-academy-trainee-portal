@@ -141,6 +141,7 @@ export interface PlayerLesson {
   title: string;
   scormPackageId: string | null;
   isCompleted: boolean;
+  estimatedDuration: number;
 }
 
 export interface PlayerModule {
