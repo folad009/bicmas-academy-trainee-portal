@@ -2,14 +2,13 @@ import React, { useState, useEffect, useRef } from "react";
 import { Course, PlayerModule } from "../types";
 import {
   ChevronLeft,
-  ChevronRight,
   Menu,
   CheckCircle,
   X,
-  Sparkles,
-  Lock,
   Award,
   Download,
+  LockIcon,
+  BookAIcon,
 } from "lucide-react";
 import { mapCourseToPlayerModules } from "@/mappers/mapCourseToPlayerModules";
 import { fetchScormLaunchUrl } from "@/api/scorm";
@@ -49,30 +48,22 @@ export const ScormPlayer: React.FC<ScormPlayerProps> = ({
 
   const lastReportedProgress = useRef<number | null>(null);
 
-  const isLessonCompleted = !!activeLesson?.isCompleted;
+  const { totalLessons, completedLessons, progress } = React.useMemo(() => {
+    const total = modules.reduce((sum, m) => sum + m.lessons.length, 0);
 
+    const completed = modules.reduce(
+      (sum, m) => sum + m.lessons.filter((l) => l.isCompleted).length,
+      0,
+    );
 
- const { totalLessons, completedLessons, progress } = React.useMemo(() => {
-  const total = modules.reduce(
-    (sum, m) => sum + m.lessons.length,
-    0
-  );
+    const pct = total ? Math.round((completed / total) * 100) : 0;
 
-  const completed = modules.reduce(
-    (sum, m) => sum + m.lessons.filter((l) => l.isCompleted).length,
-    0
-  );
-
-  const pct = total ? Math.round((completed / total) * 100) : 0;
-
-  return {
-    totalLessons: total,
-    completedLessons: completed,
-    progress: pct,
-  };
-}, [modules]);
-
-
+    return {
+      totalLessons: total,
+      completedLessons: completed,
+      progress: pct,
+    };
+  }, [modules]);
 
   // Load SCORM
   useEffect(() => {
@@ -96,37 +87,87 @@ export const ScormPlayer: React.FC<ScormPlayerProps> = ({
     load();
   }, [activeLesson]);
 
-  const handleMarkLessonComplete = () => {
-    setModules((prev) =>
-      prev.map((m, mi) => {
+  const markLessonCompletedAndAdvance = () => {
+    setModules((prevModules) => {
+      const newModules = prevModules.map((m, mi) => {
         if (mi !== activeModuleIndex) return m;
 
-        const updatedLessons = m.lessons.map((l, li) =>
+        const lessons = m.lessons.map((l, li) =>
           li === activeLessonIndex ? { ...l, isCompleted: true } : l,
         );
 
         return {
           ...m,
-          lessons: updatedLessons,
-          isCompleted: updatedLessons.every((l) => l.isCompleted),
+          lessons,
+          isCompleted: lessons.every((l) => l.isCompleted),
         };
-      }),
-    );
+      });
+
+      // Advance lesson safely using latest state
+      const currentModule = newModules[activeModuleIndex];
+
+      if (activeLessonIndex < currentModule.lessons.length - 1) {
+        setActiveLessonIndex((i) => i + 1);
+      } else if (activeModuleIndex < newModules.length - 1) {
+        setActiveModuleIndex((i) => i + 1);
+        setActiveLessonIndex(0);
+      } else {
+        setIsCourseCompleted(true);
+      }
+
+      return newModules;
+    });
   };
 
-  // Listen to SCORM messages
+  // Listen to SCORM Cloud player messages
   useEffect(() => {
     const handler = (event: MessageEvent) => {
-      if (!event.data?.type) return;
+      if (!event.data) return;
 
-      if (event.data.type === "SCORM_COMPLETED") {
-        handleMarkLessonComplete();
+      console.log("SCORM message:", event.data);
+
+      let data = event.data;
+
+      if (typeof data === "string") {
+        try {
+          data = JSON.parse(data);
+        } catch {
+          return;
+        }
+      }
+
+      if (!data.messageType) return;
+
+      switch (data.messageType) {
+        case "ScoCompleted":
+        case "CourseCompleted":
+        case "CoursePassed":
+          markLessonCompletedAndAdvance();
+          break;
+
+        case "ScoProgress":
+        case "CourseProgress": {
+          const pct = Math.round((data.progress || 0) * 100);
+
+          if (lastReportedProgress.current === pct) return;
+          lastReportedProgress.current = pct;
+
+          onUpdateProgress(course.id, pct, completedLessons);
+          syncCourseAttempt(course.id, pct).catch(console.error);
+          break;
+        }
+
+        case "PlayerExit":
+          if (lastReportedProgress.current != null) {
+            syncCourseAttempt(course.id, lastReportedProgress.current);
+          }
+          break;
       }
     };
 
     window.addEventListener("message", handler);
     return () => window.removeEventListener("message", handler);
-  }, [activeModuleIndex, activeLessonIndex]);
+  }, [course.id]);
 
   useEffect(() => {
     if (course.status === "COMPLETED") return;
@@ -151,47 +192,10 @@ export const ScormPlayer: React.FC<ScormPlayerProps> = ({
   }, [course.id]);
 
   useEffect(() => {
-  if (progress === 100) {
-    setIsCourseCompleted(true);
-  }
-}, [progress]);
-
-  const canGoNext = isLessonCompleted;
-  const canGoPrev =
-    isLessonCompleted && (activeLessonIndex > 0 || activeModuleIndex > 0);
-
-  const handlePrev = () => {
-    if (!canGoPrev) return;
-
-    if (activeLessonIndex > 0) {
-      setActiveLessonIndex((i) => i - 1);
-      return;
+    if (progress === 100) {
+      setIsCourseCompleted(true);
     }
-
-    if (activeModuleIndex > 0) {
-      const prevModuleIndex = activeModuleIndex - 1;
-      const prevModule = modules[prevModuleIndex];
-      setActiveModuleIndex(prevModuleIndex);
-      setActiveLessonIndex(prevModule.lessons.length - 1);
-    }
-  };
-
-  const handleNext = () => {
-    if (!canGoNext) return;
-
-    if (activeLessonIndex < activeModule.lessons.length - 1) {
-      setActiveLessonIndex((i) => i + 1);
-      return;
-    }
-
-    if (activeModuleIndex < modules.length - 1) {
-      setActiveModuleIndex((i) => i + 1);
-      setActiveLessonIndex(0);
-      return;
-    }
-
-    setIsCourseCompleted(true);
-  };
+  }, [progress]);
 
   if (isCourseCompleted) {
     return (
@@ -239,8 +243,8 @@ export const ScormPlayer: React.FC<ScormPlayerProps> = ({
               <div className="font-semibold px-3 py-2">{m.title}</div>
               {m.lessons.map((l, li) => {
                 const locked =
-                  mi > activeModuleIndex ||
-                  (mi === activeModuleIndex && li > activeLessonIndex);
+                  !l.isCompleted &&
+                  !(mi === activeModuleIndex && li === activeLessonIndex);
 
                 return (
                   <button
@@ -252,7 +256,14 @@ export const ScormPlayer: React.FC<ScormPlayerProps> = ({
                     }}
                     className="block w-full text-left px-6 py-2 disabled:opacity-40"
                   >
-                    {l.isCompleted ? "✔" : locked ? "🔒" : "•"} {l.title}
+                    {l.isCompleted ? (
+                      <CheckCircle />
+                    ) : locked ? (
+                      <LockIcon />
+                    ) : (
+                      <BookAIcon />
+                    )}{" "}
+                    {l.title}
                   </button>
                 );
               })}
@@ -283,36 +294,8 @@ export const ScormPlayer: React.FC<ScormPlayerProps> = ({
           )}
         </main>
       </div>
-
-      <footer className="p-4 border-t flex justify-between">
-        {!isLessonCompleted && (
-          <button
-            onClick={handleMarkLessonComplete}
-            className="px-6 py-2 rounded bg-green-600 text-white flex items-center gap-2"
-          >
-            <CheckCircle size={18} />
-            Mark as complete
-          </button>
-        )}
-
-        {isLessonCompleted && (
-          <div className="flex gap-2">
-            <button
-              onClick={handlePrev}
-              disabled={!canGoPrev}
-              className="px-6 py-2 rounded bg-gray-600 text-white disabled:opacity-40"
-            >
-              Previous
-            </button>
-
-            <button
-              onClick={handleNext}
-              className="px-6 py-2 rounded bg-blue-600 text-white"
-            >
-              {progress === 100 ? "Complete Course" : "Next Lesson"}
-            </button>
-          </div>
-        )}
+      <footer className="p-4 border-t text-sm text-gray-500 text-center">
+        Progress is tracked automatically by the course.
       </footer>
     </div>
   );

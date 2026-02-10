@@ -11,13 +11,15 @@ export const syncCourseAttempt = async (
   const status =
     completionPercentage === 100 ? "COMPLETED" : "IN_PROGRESS";
 
+  const token = getAccessToken()
+
   const res = await fetch(
     `${BASE_URL}/attempts/${courseId}`,
     {
       method: "PATCH", // or PATCH depending on backend
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${getAccessToken()}`
+        Authorization: `Bearer ${token}`
       },
       body: JSON.stringify({
         completionPercentage,
@@ -26,11 +28,18 @@ export const syncCourseAttempt = async (
     }
   );
 
+  const data = await res.json().catch(() => null);
+
   if (!res.ok) {
+    console.error("Sync error:", {
+      status: res.status,
+      statusText: res.statusText,
+      data
+    })
     throw new Error("Failed to sync attempt");
   }
 
-  return res.json();
+  return data;
 };
 
 
