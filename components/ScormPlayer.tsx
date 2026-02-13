@@ -427,30 +427,15 @@ export const ScormPlayer: React.FC<ScormPlayerProps> = ({
             <div key={m.id}>
               <div className="font-semibold px-3 py-2">{m.title}</div>
               {m.lessons.map((l, li) => {
-                const isNextLesson =
-                  mi === activeModuleIndex && li === activeLessonIndex + 1;
-
-                const locked = !isLessonUnlocked(mi, li) && !isNextLesson;
+             
 
                 return (
                   <button
                     key={l.id}
-                    disabled={locked}
-                    onClick={() => {
-                      completePreviousLessonIfEligible(mi, li);
-                      setActiveModuleIndex(mi);
-                      setActiveLessonIndex(li);
-                    }}
                     className="block w-full text-left px-6 py-2 disabled:opacity-40 flex items-center gap-2 hover:bg-slate-100 text-[15px]"
                   >
-                    {l.isCompleted ? (
-                      <CheckCircle size={20} className="text-green-500" />
-                    ) : locked ? (
-                      <LockIcon size={20} className="text-gray-500" />
-                    ) : (
-                      <BookAIcon size={20} className="text-gray-400" />
-                    )}
-                    {l.title}
+                   
+                    <BookAIcon size={20} className="text-gray-400" /> {l.title}
                   </button>
                 );
               })}
