@@ -159,7 +159,7 @@ export const ScormPlayer: React.FC<ScormPlayerProps> = ({
       "minutes",
     );
 
-    console.log("[TIME RULE] timeSpent:", Math.round(timeSpent / 1000), "sec");
+    console.log("[TIME RULE] timeSpent:", Math.round(timeSpent / 6000), "sec");
 
     setModules((prevModules) =>
       prevModules.map((m, mi) => {
