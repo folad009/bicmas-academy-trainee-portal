@@ -147,7 +147,7 @@ export const ScormPlayer: React.FC<ScormPlayerProps> = ({
     if (timeSpent < MIN_LESSON_TIME) {
       console.log(
         "[TIME RULE] Not enough time spent:",
-        Math.round(timeSpent / 1000),
+        Math.round(timeSpent / 6000),
         "sec",
       );
       return;
@@ -155,7 +155,7 @@ export const ScormPlayer: React.FC<ScormPlayerProps> = ({
 
     console.log(
       "[TIME RULE] Completing lesson after",
-      Math.round(timeSpent / 10000),
+      Math.round(timeSpent / 60000),
       "minutes",
     );
 
