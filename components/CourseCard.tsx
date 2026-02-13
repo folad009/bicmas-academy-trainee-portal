@@ -1,6 +1,6 @@
 import React from "react";
 import { Course, CourseStatus } from "../types";
-import { Play, CheckCircle, Download, Trash2, Award } from "lucide-react";
+import { Play, CheckCircle, Download, Trash2, Award, Clock } from "lucide-react";
 
 interface CourseCardProps {
   course: Course;
@@ -18,9 +18,12 @@ export const CourseCard: React.FC<CourseCardProps> = ({
   isOfflineMode,
 }) => {
   const isCompleted = course.status === CourseStatus.Completed;
-
-  // In offline mode, disable non-downloaded courses
   const isDisabled = isOfflineMode && !course.isDownloaded;
+
+  const handleDownload = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    await onDownload(course.id);
+  };
 
   return (
     <div
@@ -114,15 +117,16 @@ export const CourseCard: React.FC<CourseCardProps> = ({
                 </button>
               ) : (
                 <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onDownload(course.id);
-                  }}
+                  onClick={handleDownload}
                   className="text-slate-400 hover:text-slate-600 transition-colors p-1"
                   title="Download for Offline"
                   disabled={isOfflineMode} // Cannot download while offline
                 >
-                  <Download size={16} />
+                 {isOfflineMode ? (
+                    <Clock size={16} />
+                  ) : (
+                    <Download size={16} />
+                  )}
                 </button>
               )}
             </div>

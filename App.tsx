@@ -9,13 +9,19 @@ import { Course, CourseStatus, User, LearningPath, UserStats } from "./types";
 import { Search, Filter, Download, LogOut } from "lucide-react";
 import { CourseCard } from "./components/CourseCard";
 import { clearAuth, getAccessToken } from "./utils/auth";
-
 import { fetchLearnerDashboard } from "./api/dashboard";
 import { fetchLearningPaths } from "@/api/learningPaths";
 import { mapLearningPath } from "@/mappers/learningPathMapper";
 import { fetchAssignedCourses } from "@/api/assignedCourses";
 import { mapAssignedCourse } from "@/mappers/assignedCourseMapper";
-import { syncCourseAttempt } from "./api/attempts";
+import { getDownloadedCourses } from "./utils/offlineCourses";
+import {
+  markDownloaded,
+  removeDownloaded,
+  addToQueue,
+  getDownloadQueue,
+  clearQueue
+} from "./utils/offlineCourses";
 
 type LibraryFilter = "ALL" | "MANDATORY" | "RECOMMENDED" | "COMPLETED";
 
@@ -94,25 +100,41 @@ const [isLibraryLoading, setIsLibraryLoading] = useState(false);
 
   // Network Detection & Auto-Sync
   useEffect(() => {
-    const handleOnline = () => {
-      setIsOffline(false);
-      // Automatically attempt sync if there are pending items
-      if (pendingSync > 0) {
-        setTimeout(() => setPendingSync(0), 1500);
+  const processQueue = async () => {
+    const queue = getDownloadQueue();
+    if (!queue.length) return;
+
+    for (const courseId of queue) {
+      try {
+        await downloadCourseAssets(courseId);
+      } catch {
+        console.error("Queued download failed:", courseId);
       }
-    };
-    const handleOffline = () => {
-      setIsOffline(true);
-    };
+    }
 
-    window.addEventListener("online", handleOnline);
-    window.addEventListener("offline", handleOffline);
+    clearQueue();
+  };
 
-    return () => {
-      window.removeEventListener("online", handleOnline);
-      window.removeEventListener("offline", handleOffline);
-    };
-  }, [pendingSync]);
+  const handleOnline = () => {
+    setIsOffline(false);
+    processQueue();
+
+    if (pendingSync > 0) {
+      setTimeout(() => setPendingSync(0), 1500);
+    }
+  };
+
+  const handleOffline = () => setIsOffline(true);
+
+  window.addEventListener("online", handleOnline);
+  window.addEventListener("offline", handleOffline);
+
+  return () => {
+    window.removeEventListener("online", handleOnline);
+    window.removeEventListener("offline", handleOffline);
+  };
+}, [pendingSync]);
+
 
   useEffect(() => {
   if (!isAuthenticated || !user) return;
@@ -122,7 +144,12 @@ const [isLibraryLoading, setIsLibraryLoading] = useState(false);
       setIsLibraryLoading(true);
 
       const assignments = await fetchAssignedCourses();
-      setLibraryCourses(assignments.map(mapAssignedCourse));
+      const downloadedIds = getDownloadedCourses();
+
+      setLibraryCourses(assignments.map(mapAssignedCourse).map(course => ({
+        ...course,
+        isDownloaded: downloadedIds.includes(course.id)
+      })));
     } catch (err) {
       console.error("Assigned courses load failed:", err);
     } finally {
@@ -195,32 +222,6 @@ const handleLogout = () => {
 
 
 const handleStartCourse = async (id: string) => {
-  try {
-    const attempt = await syncCourseAttempt(id, 0);
-
-    const percentage = attempt.completionPercentage ?? 0;
-
-    setDashboardCourses(prev =>
-      updateCourseProgress(
-        prev,
-        id,
-        percentage,
-        Math.round((percentage / 100) * 10)
-      )
-    );
-
-    setLibraryCourses(prev =>
-      updateCourseProgress(
-        prev,
-        id,
-        percentage,
-        Math.round((percentage / 100) * 10)
-      )
-    );
-  } catch (err) {
-    console.error("Failed to init attempt", err);
-  }
-
   setActiveCourseId(id);
 };
 
@@ -231,6 +232,7 @@ const handleUpdateProgress = async (
   progress: number,
   completedModules: number
 ) => {
+  // Update local UI state
   setDashboardCourses(prev =>
     updateCourseProgress(prev, courseId, progress, completedModules)
   );
@@ -239,17 +241,19 @@ const handleUpdateProgress = async (
     updateCourseProgress(prev, courseId, progress, completedModules)
   );
 
-  try {
-    await syncCourseAttempt(courseId, progress);
-  } catch {
-    setPendingSync(1);
-  }
+  // No sync here — SCORM player handles backend syncing
 
+  // Refresh stats when course completes
   if (progress === 100) {
-    const dashboard = await fetchLearnerDashboard();
-    setStats(dashboard.stats);
+    try {
+      const dashboard = await fetchLearnerDashboard();
+      setStats(dashboard.stats);
+    } catch (err) {
+      console.error("Failed to refresh dashboard stats", err);
+    }
   }
 };
+
 
 
 
@@ -262,12 +266,33 @@ const toggleDownloadFlag = (
     c.id === courseId ? { ...c, isDownloaded } : c
   );
 
-const handleDownload = (courseId: string) => {
-  setLibraryCourses((prev) => toggleDownloadFlag(prev, courseId, true));
+const downloadCourseAssets = async (courseId: string) => {
+  // Placeholder for real asset caching later
+  // Example: fetch SCORM zip, videos, etc.
+  await new Promise(res => setTimeout(res, 500));
+
+  markDownloaded(courseId);
+
+  setLibraryCourses(prev =>
+    toggleDownloadFlag(prev, courseId, true)
+  );
+};
+
+const handleDownload = async (courseId: string) => {
+  if (!navigator.onLine) {
+    addToQueue(courseId);
+    return;
+  }
+
+  await downloadCourseAssets(courseId);
 };
 
 const handleRemoveDownload = (courseId: string) => {
-  setLibraryCourses((prev) => toggleDownloadFlag(prev, courseId, false));
+  removeDownloaded(courseId);
+
+  setLibraryCourses(prev =>
+    toggleDownloadFlag(prev, courseId, false)
+  );
 };
 
 

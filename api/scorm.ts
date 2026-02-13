@@ -1,6 +1,14 @@
 import { getAccessToken } from "@/utils/auth";
 import type { ScormManifestResponse } from "@/types";
 
+interface ScormLaunchResponse {
+  success: boolean;
+  launchUrl: string;
+  scormAttemptId: string;
+  message?: string;
+}
+
+
 const BASE_URL =
   "https://bicmas-academy-main-backend-production.up.railway.app/api/v1";
 
@@ -33,7 +41,7 @@ export const fetchScormManifest = async (
 
 export const fetchScormLaunchUrl = async (
   scormPackageId: string
-): Promise<{ launchUrl: string }> => {
+): Promise<ScormLaunchResponse> => {
   const res = await fetch(
     `${BASE_URL}/scorm-packages/${scormPackageId}/launch`,
     {
@@ -47,5 +55,12 @@ export const fetchScormLaunchUrl = async (
     throw new Error("Failed to get SCORM launch URL");
   }
 
-  return res.json();
+  const data: ScormLaunchResponse = await res.json();
+
+  if (!data.launchUrl || !data.scormAttemptId) {
+    throw new Error("Invalid launch response from server");
+  }
+
+  return data;
 };
+
