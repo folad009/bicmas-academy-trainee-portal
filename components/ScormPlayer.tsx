@@ -27,9 +27,7 @@ export const ScormPlayer: React.FC<ScormPlayerProps> = ({
   // ----------------------------
   // Course structure (navigation only)
   // ----------------------------
-  const [modules, setModules] = useState<PlayerModule[]>(
-    mapCourseToPlayerModules(course),
-  );
+  const [modules, setModules] = useState<PlayerModule[]>([]);
 
   useEffect(() => {
     setModules(mapCourseToPlayerModules(course));
@@ -61,12 +59,27 @@ export const ScormPlayer: React.FC<ScormPlayerProps> = ({
   const syncTimeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
+    if (!course?.modules) {
+      console.warn("Course has no modules. Full course data required.");
+      setModules([]);
+      return;
+    }
+
+    setModules(mapCourseToPlayerModules(course));
+  }, [course]);
+
+  useEffect(() => {
     scormAttemptIdRef.current = scormAttemptId;
   }, [scormAttemptId]);
 
   useEffect(() => {
     onUpdateProgressRef.current = onUpdateProgress;
   }, [onUpdateProgress]);
+
+  useEffect(() => {
+    setActiveModuleIndex(0);
+    setActiveLessonIndex(0);
+  }, [course]);
 
   // ----------------------------
   // Debounced sync (important)
@@ -260,31 +273,37 @@ export const ScormPlayer: React.FC<ScormPlayerProps> = ({
 
       <div className="flex flex-1 overflow-hidden">
         <aside className={`w-80 border-r ${!isSidebarOpen && "hidden"}`}>
-          {modules.map((m, moduleIndex) => (
-            <div key={m.id}>
-              <div className="font-semibold px-3 py-2">{m.title}</div>
-
-              {m.lessons.map((l, lessonIndex) => (
-                <button
-                  key={l.id}
-                  onClick={() => {
-                    setActiveModuleIndex(moduleIndex);
-                    setActiveLessonIndex(lessonIndex);
-                  }}
-                  className={`block w-full text-left px-6 py-2 flex items-center gap-2 hover:bg-slate-100 text-[15px]
-          ${
-            moduleIndex === activeModuleIndex &&
-            lessonIndex === activeLessonIndex
-              ? "bg-slate-100 font-medium"
-              : ""
-          }`}
-                >
-                  <BookAIcon size={20} className="text-gray-400" />
-                  {l.title}
-                </button>
-              ))}
+          {modules.length === 0 ? (
+            <div className="p-4 text-sm text-gray-500">
+              Course content is not available.
             </div>
-          ))}
+          ) : (
+            modules.map((m, moduleIndex) => (
+              <div key={m.id}>
+                <div className="font-semibold px-3 py-2">{m.title}</div>
+
+                {m.lessons.map((l, lessonIndex) => (
+                  <button
+                    key={l.id}
+                    onClick={() => {
+                      setActiveModuleIndex(moduleIndex);
+                      setActiveLessonIndex(lessonIndex);
+                    }}
+                    className={`block w-full text-left px-6 py-2 flex items-center gap-2 hover:bg-slate-100 text-[15px]
+              ${
+                moduleIndex === activeModuleIndex &&
+                lessonIndex === activeLessonIndex
+                  ? "bg-slate-100 font-medium"
+                  : ""
+              }`}
+                  >
+                    <BookAIcon size={20} className="text-gray-400" />
+                    {l.title}
+                  </button>
+                ))}
+              </div>
+            ))
+          )}
         </aside>
 
         <main className="flex-1 bg-black">
