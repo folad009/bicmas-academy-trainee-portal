@@ -1,13 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Course, PlayerModule } from "../types";
-import {
-  ChevronLeft,
-  Menu,
-  X,
-  Award,
-  Download,
-  BookAIcon,
-} from "lucide-react";
+import { ChevronLeft, Menu, X, Award, Download, BookAIcon } from "lucide-react";
 import { mapCourseToPlayerModules } from "@/mappers/mapCourseToPlayerModules";
 import { fetchScormLaunchUrl } from "@/api/scorm";
 import { syncCourseAttempt } from "@/api/attempts";
@@ -18,7 +11,7 @@ interface ScormPlayerProps {
   onUpdateProgress: (
     courseId: string,
     progress: number,
-    completedLessons: number
+    completedLessons: number,
   ) => void;
   onViewCertificate: () => void;
 }
@@ -35,7 +28,7 @@ export const ScormPlayer: React.FC<ScormPlayerProps> = ({
   // Course structure (navigation only)
   // ----------------------------
   const [modules, setModules] = useState<PlayerModule[]>(
-    mapCourseToPlayerModules(course)
+    mapCourseToPlayerModules(course),
   );
 
   useEffect(() => {
@@ -204,7 +197,18 @@ export const ScormPlayer: React.FC<ScormPlayerProps> = ({
     return (
       <div className="fixed inset-0 bg-slate-50 flex flex-col">
         <header className="bg-white border-b px-6 py-4 flex justify-between">
-          <button onClick={onBack}>
+          <button
+            onClick={async () => {
+              if (scormAttemptIdRef.current) {
+                try {
+                  await syncCourseAttempt(scormAttemptIdRef.current);
+                } catch (e) {
+                  console.error("Final sync failed", e);
+                }
+              }
+              onBack();
+            }}
+          >
             <ChevronLeft size={20} /> Back
           </button>
           <div>{course.title}</div>
@@ -233,24 +237,47 @@ export const ScormPlayer: React.FC<ScormPlayerProps> = ({
   return (
     <div className="fixed inset-0 flex flex-col">
       <header className="bg-slate-900 text-white px-4 py-3 flex justify-between">
-        <button onClick={onBack}>
-          <X size={20} />
-        </button>
-        <div>{course.title}</div>
         <button onClick={() => setIsSidebarOpen(!isSidebarOpen)}>
           <Menu size={20} />
+        </button>
+        <div>{course.title}</div>
+
+        <button
+          onClick={async () => {
+            if (scormAttemptIdRef.current) {
+              try {
+                await syncCourseAttempt(scormAttemptIdRef.current);
+              } catch (e) {
+                console.error("Final sync failed", e);
+              }
+            }
+            onBack();
+          }}
+        >
+          <X size={20} />
         </button>
       </header>
 
       <div className="flex flex-1 overflow-hidden">
         <aside className={`w-80 border-r ${!isSidebarOpen && "hidden"}`}>
-          {modules.map((m) => (
+          {modules.map((m, moduleIndex) => (
             <div key={m.id}>
               <div className="font-semibold px-3 py-2">{m.title}</div>
-              {m.lessons.map((l) => (
+
+              {m.lessons.map((l, lessonIndex) => (
                 <button
                   key={l.id}
-                  className="block w-full text-left px-6 py-2 flex items-center gap-2 hover:bg-slate-100 text-[15px]"
+                  onClick={() => {
+                    setActiveModuleIndex(moduleIndex);
+                    setActiveLessonIndex(lessonIndex);
+                  }}
+                  className={`block w-full text-left px-6 py-2 flex items-center gap-2 hover:bg-slate-100 text-[15px]
+          ${
+            moduleIndex === activeModuleIndex &&
+            lessonIndex === activeLessonIndex
+              ? "bg-slate-100 font-medium"
+              : ""
+          }`}
                 >
                   <BookAIcon size={20} className="text-gray-400" />
                   {l.title}

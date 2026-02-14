@@ -1,6 +1,16 @@
 import { Course, LearningPath, UserStats } from "../types";
 import { getAccessToken } from "../utils/auth";
 
+/**
+ * Raw backend shapes
+ * Note: unfinishedCourses are ASSIGNMENTS, not pure courses
+ */
+interface RawAssignment {
+  id: string;
+  dueDate: string | null;
+  course: Course;
+}
+
 export interface RawLearnerDashboardPayload {
   streak: number;
   points: number;
@@ -9,16 +19,22 @@ export interface RawLearnerDashboardPayload {
   averageScore: number;
   learningPaths: LearningPath[];
   learningActivity: Record<string, number>;
-  currentCourse: Course | null;
-  unfinishedCourses: Course[];
+  currentCourse: any; // backend returns a complex object, not just Course
+  unfinishedCourses: RawAssignment[];
 }
 
 export interface LearnerDashboardViewModel {
-  courses: Course[];
+  courses: (Course & {
+    assignmentId: string;
+    dueDate: string | null;
+  })[];
   learningPath: LearningPath | null;
   stats: UserStats;
 }
 
+/**
+ * Fetch dashboard and map backend → UI-friendly shape
+ */
 export async function fetchLearnerDashboard(): Promise<LearnerDashboardViewModel> {
   const token = getAccessToken();
 
@@ -37,27 +53,66 @@ export async function fetchLearnerDashboard(): Promise<LearnerDashboardViewModel
 
   const raw: RawLearnerDashboardPayload = await res.json();
 
+  const activity = raw.learningActivity || {};
+
   return {
-    courses: raw.unfinishedCourses ?? [],
+    // Flatten assignment → course for UI
+    courses: (raw.unfinishedCourses ?? []).map((assignment) => ({
+      ...assignment.course,
+      assignmentId: assignment.id,
+      dueDate: assignment.dueDate,
+    })),
+
     learningPath: raw.learningPaths?.[0] ?? null,
+
     stats: {
-      streakDays: raw.streak,
-      bicmasCoins: raw.points,
-      totalLearningHours: raw.learningHours,
-      completedCourses: raw.coursesDone,
-      averageScore: raw.averageScore,
+      streakDays: raw.streak ?? 0,
+      bicmasCoins: raw.points ?? 0,
+      totalLearningHours: raw.learningHours ?? 0,
+      completedCourses: raw.coursesDone ?? 0,
+      averageScore: raw.averageScore ?? 0,
+
+      // Monday-first defensive mapping
       weeklyActivity: [
-        raw.learningActivity.Mon,
-        raw.learningActivity.Tue,
-        raw.learningActivity.Wed,
-        raw.learningActivity.Thu,
-        raw.learningActivity.Fri,
-        raw.learningActivity.Sat,
-        raw.learningActivity.Sun,
+        activity.Mon || 0,
+        activity.Tue || 0,
+        activity.Wed || 0,
+        activity.Thu || 0,
+        activity.Fri || 0,
+        activity.Sat || 0,
+        activity.Sun || 0,
       ],
+
       scoreTrend: 0,
       completedCoursesTrend: 0,
       badges: [],
     },
   };
 }
+
+/**
+ * Sync SCORM progress, then reload dashboard
+ */
+export async function syncProgressAndRefresh(
+  progressId: string
+): Promise<LearnerDashboardViewModel> {
+  const token = getAccessToken();
+
+  const res = await fetch(
+    `https://bicmas-academy-main-backend-production.up.railway.app/api/v1/attempts/${progressId}/sync-progress`,
+    {
+      method: "PATCH",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    }
+  );
+
+  if (!res.ok) {
+    throw new Error("Failed to sync progress");
+  }
+
+  // After sync, refetch dashboard so aggregates update
+  return fetchLearnerDashboard();
+}
+
