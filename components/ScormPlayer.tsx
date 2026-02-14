@@ -29,10 +29,6 @@ export const ScormPlayer: React.FC<ScormPlayerProps> = ({
   // ----------------------------
   const [modules, setModules] = useState<PlayerModule[]>([]);
 
-  useEffect(() => {
-    setModules(mapCourseToPlayerModules(course));
-  }, [course]);
-
   const [activeModuleIndex, setActiveModuleIndex] = useState(0);
   const [activeLessonIndex, setActiveLessonIndex] = useState(0);
 
@@ -80,6 +76,11 @@ export const ScormPlayer: React.FC<ScormPlayerProps> = ({
     setActiveModuleIndex(0);
     setActiveLessonIndex(0);
   }, [course]);
+
+  useEffect(() => {
+  console.log("COURSE PASSED TO PLAYER:", course);
+}, [course]);
+
 
   // ----------------------------
   // Debounced sync (important)
