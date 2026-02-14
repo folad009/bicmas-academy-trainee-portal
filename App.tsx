@@ -20,7 +20,7 @@ import {
   removeDownloaded,
   addToQueue,
   getDownloadQueue,
-  clearQueue
+  clearQueue,
 } from "./utils/offlineCourses";
 
 type LibraryFilter = "ALL" | "MANDATORY" | "RECOMMENDED" | "COMPLETED";
@@ -41,14 +41,14 @@ const DEFAULT_STATS: UserStats = {
   weeklyActivity: [],
   scoreTrend: 0,
   completedCoursesTrend: 0,
-  badges: []
+  badges: [],
 };
 
 const updateCourseProgress = (
   courses: Course[],
   courseId: string,
   progress: number,
-  completedModules: number
+  completedModules: number,
 ): Course[] =>
   courses.map((c) => {
     if (c.id !== courseId) return c;
@@ -57,7 +57,6 @@ const updateCourseProgress = (
     return { ...c, progress, completedModules, status };
   });
 
-
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState<User | null>(null);
@@ -65,19 +64,14 @@ export default function App() {
   const [activeView, setActiveView] = useState("dashboard");
   const [activeCourseId, setActiveCourseId] = useState<string | null>(null);
 
- const [dashboardCourses, setDashboardCourses] = useState<Course[]>([]);
-const [libraryCourses, setLibraryCourses] = useState<Course[]>([]);
+  const [dashboardCourses, setDashboardCourses] = useState<Course[]>([]);
+  const [libraryCourses, setLibraryCourses] = useState<Course[]>([]);
 
-const [isDashboardLoading, setIsDashboardLoading] = useState(false);
-const [isLibraryLoading, setIsLibraryLoading] = useState(false);
-
-
+  const [isDashboardLoading, setIsDashboardLoading] = useState(false);
+  const [isLibraryLoading, setIsLibraryLoading] = useState(false);
 
   const [learningPath, setLearningPath] = useState<LearningPath | null>(null);
   const [stats, setStats] = useState<UserStats>(DEFAULT_STATS);
-
-
-  
 
   // Initialize offline state based on navigator status
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
@@ -90,6 +84,11 @@ const [isLibraryLoading, setIsLibraryLoading] = useState(false);
   const [filter, setFilter] = useState<LibraryFilter>("ALL");
   const [search, setSearch] = useState("");
 
+  const activeCourse =
+    libraryCourses.find((c) => c.id === activeCourseId) ||
+    dashboardCourses.find((c) => c.id === activeCourseId) ||
+    null;
+
   // Restore auth on refresh
   useEffect(() => {
     const token = getAccessToken();
@@ -100,94 +99,93 @@ const [isLibraryLoading, setIsLibraryLoading] = useState(false);
 
   // Network Detection & Auto-Sync
   useEffect(() => {
-  const processQueue = async () => {
-    const queue = getDownloadQueue();
-    if (!queue.length) return;
+    const processQueue = async () => {
+      const queue = getDownloadQueue();
+      if (!queue.length) return;
 
-    for (const courseId of queue) {
-      try {
-        await downloadCourseAssets(courseId);
-      } catch {
-        console.error("Queued download failed:", courseId);
+      for (const courseId of queue) {
+        try {
+          await downloadCourseAssets(courseId);
+        } catch {
+          console.error("Queued download failed:", courseId);
+        }
       }
-    }
 
-    clearQueue();
-  };
+      clearQueue();
+    };
 
-  const handleOnline = () => {
-    setIsOffline(false);
-    processQueue();
+    const handleOnline = () => {
+      setIsOffline(false);
+      processQueue();
 
-    if (pendingSync > 0) {
-      setTimeout(() => setPendingSync(0), 1500);
-    }
-  };
+      if (pendingSync > 0) {
+        setTimeout(() => setPendingSync(0), 1500);
+      }
+    };
 
-  const handleOffline = () => setIsOffline(true);
+    const handleOffline = () => setIsOffline(true);
 
-  window.addEventListener("online", handleOnline);
-  window.addEventListener("offline", handleOffline);
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
 
-  return () => {
-    window.removeEventListener("online", handleOnline);
-    window.removeEventListener("offline", handleOffline);
-  };
-}, [pendingSync]);
-
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, [pendingSync]);
 
   useEffect(() => {
-  if (!isAuthenticated || !user) return;
+    if (!isAuthenticated || !user) return;
 
-  const loadLibrary = async () => {
-    try {
-      setIsLibraryLoading(true);
+    const loadLibrary = async () => {
+      try {
+        setIsLibraryLoading(true);
 
-      const assignments = await fetchAssignedCourses();
-      const downloadedIds = getDownloadedCourses();
+        const assignments = await fetchAssignedCourses();
+        const downloadedIds = getDownloadedCourses();
 
-      setLibraryCourses(assignments.map(mapAssignedCourse).map(course => ({
-        ...course,
-        isDownloaded: downloadedIds.includes(course.id)
-      })));
-    } catch (err) {
-      console.error("Assigned courses load failed:", err);
-    } finally {
-      setIsLibraryLoading(false);
-    }
-  };
+        setLibraryCourses(
+          assignments.map(mapAssignedCourse).map((course) => ({
+            ...course,
+            isDownloaded: downloadedIds.includes(course.id),
+          })),
+        );
+      } catch (err) {
+        console.error("Assigned courses load failed:", err);
+      } finally {
+        setIsLibraryLoading(false);
+      }
+    };
 
-  loadLibrary();
-}, [isAuthenticated, user]);
+    loadLibrary();
+  }, [isAuthenticated, user]);
 
+  useEffect(() => {
+    if (!isAuthenticated || !user) return;
 
-useEffect(() => {
-  if (!isAuthenticated || !user) return;
+    const loadDashboard = async () => {
+      try {
+        setIsDashboardLoading(true);
 
-  const loadDashboard = async () => {
-    try {
-      setIsDashboardLoading(true);
+        const [dashboard, paths] = await Promise.all([
+          fetchLearnerDashboard(),
+          fetchLearningPaths(),
+        ]);
 
-      const [dashboard, paths] = await Promise.all([
-        fetchLearnerDashboard(),
-        fetchLearningPaths(),
-      ]);
+        setDashboardCourses(dashboard.courses);
+        setStats(dashboard.stats);
 
-      setDashboardCourses(dashboard.courses);
-      setStats(dashboard.stats);
+        const publishedPath = paths.find((p) => p.status === "PUBLISHED");
+        setLearningPath(publishedPath ? mapLearningPath(publishedPath) : null);
+      } catch (err) {
+        console.error("Dashboard load failed:", err);
+      } finally {
+        setIsDashboardLoading(false);
+      }
+    };
 
-      const publishedPath = paths.find((p) => p.status === "PUBLISHED");
-      setLearningPath(publishedPath ? mapLearningPath(publishedPath) : null);
-    } catch (err) {
-      console.error("Dashboard load failed:", err);
-    } finally {
-      setIsDashboardLoading(false);
-    }
-  };
-
-  loadDashboard();
-}, [isAuthenticated, user]);
-
+    loadDashboard();
+  }, [isAuthenticated, user]);
 
   const handleLogin = async (backendUser: any) => {
     setUser({
@@ -201,100 +199,86 @@ useEffect(() => {
     setIsAuthenticated(true);
   };
 
-const handleLogout = () => {
-  clearAuth();
+  const handleLogout = () => {
+    clearAuth();
 
-  // Auth
-  setIsAuthenticated(false);
-  setUser(null);
+    // Auth
+    setIsAuthenticated(false);
+    setUser(null);
 
-  // App state reset (important)
-  setActiveCourseId(null);
-  setActiveView("dashboard");
+    // App state reset (important)
+    setActiveCourseId(null);
+    setActiveView("dashboard");
 
-  setDashboardCourses([]);
-  setLibraryCourses([]);
-  setLearningPath(null);
-  setStats(DEFAULT_STATS);
+    setDashboardCourses([]);
+    setLibraryCourses([]);
+    setLearningPath(null);
+    setStats(DEFAULT_STATS);
 
-  setPendingSync(0);
-};
+    setPendingSync(0);
+  };
 
+  const handleStartCourse = async (id: string) => {
+    setActiveCourseId(id);
+  };
 
-const handleStartCourse = async (id: string) => {
-  setActiveCourseId(id);
-};
+  const handleUpdateProgress = async (
+    courseId: string,
+    progress: number,
+    completedModules: number,
+  ) => {
+    // Update local UI state
+    setDashboardCourses((prev) =>
+      updateCourseProgress(prev, courseId, progress, completedModules),
+    );
 
+    setLibraryCourses((prev) =>
+      updateCourseProgress(prev, courseId, progress, completedModules),
+    );
+    console.log("Library after update:", progress, courseId);
 
-
-const handleUpdateProgress = async (
-  courseId: string,
-  progress: number,
-  completedModules: number
-) => {
-  // Update local UI state
-  setDashboardCourses(prev =>
-    updateCourseProgress(prev, courseId, progress, completedModules)
-  );
-
-  setLibraryCourses(prev =>
-    updateCourseProgress(prev, courseId, progress, completedModules)
-  );
-
-  // No sync here — SCORM player handles backend syncing
-
-  // Refresh stats when course completes
-  if (progress === 100) {
-    try {
-      const dashboard = await fetchLearnerDashboard();
-      setStats(dashboard.stats);
-    } catch (err) {
-      console.error("Failed to refresh dashboard stats", err);
+    // Refresh stats when course completes
+    if (progress >= 100) {
+      try {
+        const dashboard = await fetchLearnerDashboard();
+        setStats(dashboard.stats);
+        setDashboardCourses(dashboard.courses);
+      } catch (err) {
+        console.error("Failed to refresh dashboard stats", err);
+      }
     }
-  }
-};
+  };
 
+  const toggleDownloadFlag = (
+    courses: Course[],
+    courseId: string,
+    isDownloaded: boolean,
+  ) => courses.map((c) => (c.id === courseId ? { ...c, isDownloaded } : c));
 
+  const downloadCourseAssets = async (courseId: string) => {
+    // Placeholder for real asset caching later
+    // Example: fetch SCORM zip, videos, etc.
+    await new Promise((res) => setTimeout(res, 500));
 
+    markDownloaded(courseId);
 
-const toggleDownloadFlag = (
-  courses: Course[],
-  courseId: string,
-  isDownloaded: boolean
-) =>
-  courses.map((c) =>
-    c.id === courseId ? { ...c, isDownloaded } : c
-  );
+    setLibraryCourses((prev) => toggleDownloadFlag(prev, courseId, true));
+  };
 
-const downloadCourseAssets = async (courseId: string) => {
-  // Placeholder for real asset caching later
-  // Example: fetch SCORM zip, videos, etc.
-  await new Promise(res => setTimeout(res, 500));
+  const handleDownload = async (courseId: string) => {
+    if (!navigator.onLine) {
+      addToQueue(courseId);
+      return;
+    }
 
-  markDownloaded(courseId);
+    await downloadCourseAssets(courseId);
+  };
 
-  setLibraryCourses(prev =>
-    toggleDownloadFlag(prev, courseId, true)
-  );
-};
+  const handleRemoveDownload = (courseId: string) => {
+    removeDownloaded(courseId);
 
-const handleDownload = async (courseId: string) => {
-  if (!navigator.onLine) {
-    addToQueue(courseId);
-    return;
-  }
-
-  await downloadCourseAssets(courseId);
-};
-
-const handleRemoveDownload = (courseId: string) => {
-  removeDownloaded(courseId);
-
-  setLibraryCourses(prev =>
-    toggleDownloadFlag(prev, courseId, false)
-  );
-};
-
+    setLibraryCourses((prev) => toggleDownloadFlag(prev, courseId, false));
+  };
 
   const toggleOffline = () => {
     // Manual toggle for simulation/testing
@@ -330,8 +314,6 @@ const handleRemoveDownload = (courseId: string) => {
       return true;
     });
   }, [libraryCourses, search, filter, isOffline]);
-
-
 
   const renderLibrary = () => (
     <div className="space-y-6 animate-in fade-in zoom-in duration-300">
@@ -433,8 +415,9 @@ const handleRemoveDownload = (courseId: string) => {
                 </button>
               </div>
             ))}
-          {[...dashboardCourses, ...libraryCourses].filter((c) => c.status === CourseStatus.Completed).length ===
-            0 && (
+          {[...dashboardCourses, ...libraryCourses].filter(
+            (c) => c.status === CourseStatus.Completed,
+          ).length === 0 && (
             <div className="p-12 text-center text-slate-500">
               Complete a course to earn your first certificate!
             </div>
@@ -508,16 +491,12 @@ const handleRemoveDownload = (courseId: string) => {
 
   return (
     <>
-      {activeCourseId ? (
+      {activeCourseId && activeCourse ? (
         <ScormPlayer
-          course={[...dashboardCourses, ...libraryCourses].find((c) => c.id === activeCourseId)!}
+          course={activeCourse}
           onBack={() => setActiveCourseId(null)}
           onUpdateProgress={handleUpdateProgress}
-          onViewCertificate={() =>
-            setSelectedCertificate(
-              [...dashboardCourses, ...libraryCourses].find((c) => c.id === activeCourseId) || null,
-            )
-          }
+          onViewCertificate={() => setSelectedCertificate(activeCourse)}
         />
       ) : (
         <Layout
@@ -529,7 +508,7 @@ const handleRemoveDownload = (courseId: string) => {
           pendingSync={pendingSync}
         >
           {activeView === "dashboard" &&
-            (isDashboardLoading  ? (
+            (isDashboardLoading ? (
               <div className="p-10 text-center text-slate-500">
                 Loading dashboard…
               </div>
@@ -564,4 +543,3 @@ const handleRemoveDownload = (courseId: string) => {
     </>
   );
 }
-

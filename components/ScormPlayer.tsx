@@ -86,14 +86,27 @@ export const ScormPlayer: React.FC<ScormPlayerProps> = ({
   // Debounced sync (important)
   // ----------------------------
   const scheduleSync = (attemptId: string) => {
-    if (syncTimeoutRef.current) {
-      clearTimeout(syncTimeoutRef.current);
-    }
+  if (syncTimeoutRef.current) {
+    clearTimeout(syncTimeoutRef.current);
+  }
 
-    syncTimeoutRef.current = window.setTimeout(() => {
-      syncCourseAttempt(attemptId).catch(console.error);
-    }, 2000);
-  };
+  syncTimeoutRef.current = window.setTimeout(() => {
+    console.log("Syncing courseId:", course.id);
+    console.log("Value passed to sync:", attemptId);
+    console.log("SCORM attemptId:", scormAttemptIdRef.current);
+
+    syncCourseAttempt(attemptId)
+      .then((data) => {
+        if(data?.completionPercentage !== undefined) {
+          const pct = Math.round(data.completionPercentage);
+          setScormProgress(pct);
+          onUpdateProgressRef.current(course.id, pct, 0);
+        }
+      })
+      .catch(console.error);
+  }, 2000);
+};
+
 
   // ----------------------------
   // Load SCORM launch URL
@@ -161,7 +174,7 @@ export const ScormPlayer: React.FC<ScormPlayerProps> = ({
 
           onUpdateProgressRef.current(course.id, pct, 0);
 
-          scheduleSync(scormAttemptIdRef.current);
+          scheduleSync(scormAttemptIdRef.current!);
           break;
         }
 
@@ -173,12 +186,12 @@ export const ScormPlayer: React.FC<ScormPlayerProps> = ({
 
           onUpdateProgressRef.current(course.id, 100, 0);
 
-          scheduleSync(scormAttemptIdRef.current);
+          scheduleSync(scormAttemptIdRef.current!);
           break;
         }
 
         case "PlayerExit": {
-          scheduleSync(scormAttemptIdRef.current);
+          scheduleSync(scormAttemptIdRef.current!);
           break;
         }
       }
@@ -193,10 +206,11 @@ export const ScormPlayer: React.FC<ScormPlayerProps> = ({
   // ----------------------------
   useEffect(() => {
     const onUnload = () => {
-      if (scormAttemptIdRef.current) {
-        syncCourseAttempt(scormAttemptIdRef.current);
-      }
-    };
+  if (scormAttemptIdRef.current) {
+    syncCourseAttempt(scormAttemptIdRef.current);
+  }
+};
+
 
     window.addEventListener("beforeunload", onUnload);
     return () => window.removeEventListener("beforeunload", onUnload);

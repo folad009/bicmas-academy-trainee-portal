@@ -19,7 +19,7 @@ export function mapAssignedCourse(assignment: any): Course {
         ? CourseStatus.InProgress
         : CourseStatus.NotStarted,
 
-    progress: assignment.progress ?? 0,
+    progress: assignment.attempt?.completionPercentage ?? 0,
 
     totalModules: modules.length,
     completedModules: 0, // backend does not provide this yet

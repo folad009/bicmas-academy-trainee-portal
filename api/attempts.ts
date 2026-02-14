@@ -64,9 +64,9 @@ export const updateCourseAttempt = async (
 /**
  * Sync SCORM progress from SCORM Cloud
  */
-export const syncScormProgress = async (courseId: string) => {
+export const syncScormProgress = async (attemptId: string) => {
   return authFetch(
-    `${BASE_URL}/attempts/${courseId}/sync-progress`,
+    `${BASE_URL}/attempts/${attemptId}/sync-progress`,
     {
       method: "PATCH"
     }
@@ -78,21 +78,8 @@ export const syncScormProgress = async (courseId: string) => {
  * 1. Pull SCORM progress
  * 2. Update local attempt if backend returns percentage
  */
-export const syncCourseAttempt = async (courseId: string) => {
-  const scormRes = await syncScormProgress(courseId);
-  const scormData = scormRes?.data; // unwrap here
-
-  let attempt = null;
-
-  if (scormData?.completionPercentage !== undefined) {
-    attempt = await updateCourseAttempt(
-      courseId,
-      scormData.completionPercentage
-    );
-  }
-
-  return {
-    scorm: scormData,
-    attempt
-  };
+export const syncCourseAttempt = async (attemptId: string) => {
+  const scormRes = await syncScormProgress(attemptId);
+  return scormRes?.data;
 };
+
