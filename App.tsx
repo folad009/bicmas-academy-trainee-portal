@@ -89,6 +89,25 @@ export default function App() {
     dashboardCourses.find((c) => c.id === activeCourseId) ||
     null;
 
+  const refreshDashboard = async () => {
+    if (!isAuthenticated || !user) return;
+
+    try {
+      const [dashboard, paths] = await Promise.all([
+        fetchLearnerDashboard(),
+        fetchLearningPaths(),
+      ]);
+
+      setDashboardCourses(dashboard.courses);
+      setStats(dashboard.stats);
+
+      const publishedPath = paths.find((p) => p.status === "PUBLISHED");
+      setLearningPath(publishedPath ? mapLearningPath(publishedPath) : null);
+    } catch (err) {
+      console.error("Dashboard refresh failed:", err);
+    }
+  };
+
   // Restore auth on refresh
   useEffect(() => {
     const token = getAccessToken();
@@ -163,28 +182,8 @@ export default function App() {
   useEffect(() => {
     if (!isAuthenticated || !user) return;
 
-    const loadDashboard = async () => {
-      try {
-        setIsDashboardLoading(true);
-
-        const [dashboard, paths] = await Promise.all([
-          fetchLearnerDashboard(),
-          fetchLearningPaths(),
-        ]);
-
-        setDashboardCourses(dashboard.courses);
-        setStats(dashboard.stats);
-
-        const publishedPath = paths.find((p) => p.status === "PUBLISHED");
-        setLearningPath(publishedPath ? mapLearningPath(publishedPath) : null);
-      } catch (err) {
-        console.error("Dashboard load failed:", err);
-      } finally {
-        setIsDashboardLoading(false);
-      }
-    };
-
-    loadDashboard();
+    setIsDashboardLoading(true);
+    refreshDashboard().finally(() => setIsDashboardLoading(false));
   }, [isAuthenticated, user]);
 
   const handleLogin = async (backendUser: any) => {
@@ -497,6 +496,7 @@ export default function App() {
           onBack={() => setActiveCourseId(null)}
           onUpdateProgress={handleUpdateProgress}
           onViewCertificate={() => setSelectedCertificate(activeCourse)}
+          onRefreshDashboard={refreshDashboard}
         />
       ) : (
         <Layout

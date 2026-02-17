@@ -1,4 +1,4 @@
-import { Course, LearningPath, UserStats } from "../types";
+import { Course, CourseStatus, LearningPath, UserStats } from "../types";
 import { getAccessToken } from "../utils/auth";
 
 /**
@@ -7,6 +7,7 @@ import { getAccessToken } from "../utils/auth";
  */
 interface RawAssignment {
   id: string;
+  courseId: string;
   dueDate: string | null;
   course: Course;
 }
@@ -44,7 +45,7 @@ export async function fetchLearnerDashboard(): Promise<LearnerDashboardViewModel
       headers: {
         Authorization: `Bearer ${token}`,
       },
-    }
+    },
   );
 
   if (!res.ok) {
@@ -55,13 +56,28 @@ export async function fetchLearnerDashboard(): Promise<LearnerDashboardViewModel
 
   const activity = raw.learningActivity || {};
 
+  const currentAttempt = raw.currentCourse?.attempt;
+
+  const attemptProgress =
+  raw.currentCourse?.attempt?.completionPercentage ?? 0;
+
   return {
-    // Flatten assignment → course for UI
-    courses: (raw.unfinishedCourses ?? []).map((assignment) => ({
+    courses: (raw.unfinishedCourses ?? []).map((assignment, index) => {
+      const progress = index === 0 ? attemptProgress : 0;
+
+    return {
       ...assignment.course,
       assignmentId: assignment.id,
       dueDate: assignment.dueDate,
-    })),
+      progress,
+      status:
+        progress >= 100
+          ? CourseStatus.Completed
+          : progress > 0
+          ? CourseStatus.InProgress
+          : CourseStatus.NotStarted,
+    };
+  }),
 
     learningPath: raw.learningPaths?.[0] ?? null,
 
@@ -94,7 +110,7 @@ export async function fetchLearnerDashboard(): Promise<LearnerDashboardViewModel
  * Sync SCORM progress, then reload dashboard
  */
 export async function syncProgressAndRefresh(
-  progressId: string
+  progressId: string,
 ): Promise<LearnerDashboardViewModel> {
   const token = getAccessToken();
 
@@ -105,7 +121,7 @@ export async function syncProgressAndRefresh(
       headers: {
         Authorization: `Bearer ${token}`,
       },
-    }
+    },
   );
 
   if (!res.ok) {
@@ -115,4 +131,3 @@ export async function syncProgressAndRefresh(
   // After sync, refetch dashboard so aggregates update
   return fetchLearnerDashboard();
 }
-

@@ -1,9 +1,22 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Course, PlayerModule } from "../types";
-import { ChevronLeft, Menu, X, Award, Download, BookAIcon } from "lucide-react";
+import {
+  ChevronLeft,
+  Menu,
+  X,
+  Award,
+  Download,
+  BookAIcon,
+  ArrowBigLeft,
+  ArrowLeft,
+  ArrowLeftCircle,
+} from "lucide-react";
 import { mapCourseToPlayerModules } from "@/mappers/mapCourseToPlayerModules";
 import { fetchScormLaunchUrl } from "@/api/scorm";
-import { syncCourseAttempt } from "@/api/attempts";
+import { syncCourseAttempt, updateCourseAttempt } from "@/api/attempts";
+
+const BASE_URL =
+  "https://bicmas-academy-main-backend-production.up.railway.app/api/v1";
 
 interface ScormPlayerProps {
   course: Course;
@@ -14,6 +27,7 @@ interface ScormPlayerProps {
     completedLessons: number,
   ) => void;
   onViewCertificate: () => void;
+  onRefreshDashboard?: () => Promise<void>;
 }
 
 const SCORM_ORIGIN = "https://cloud.scorm.com";
@@ -23,10 +37,15 @@ export const ScormPlayer: React.FC<ScormPlayerProps> = ({
   onBack,
   onUpdateProgress,
   onViewCertificate,
+  onRefreshDashboard,
 }) => {
   // ----------------------------
   // Course structure (navigation only)
   // ----------------------------
+
+  const navigationTriggeredRef = useRef(false);
+
+
   const [modules, setModules] = useState<PlayerModule[]>([]);
 
   const [activeModuleIndex, setActiveModuleIndex] = useState(0);
@@ -54,6 +73,9 @@ export const ScormPlayer: React.FC<ScormPlayerProps> = ({
   const onUpdateProgressRef = useRef(onUpdateProgress);
   const syncTimeoutRef = useRef<number | null>(null);
 
+  const lastSavedProgress = useRef<number>(0);
+  const saveTimeoutRef = useRef<number | null>(null);
+
   useEffect(() => {
     if (!course?.modules) {
       console.warn("Course has no modules. Full course data required.");
@@ -78,35 +100,78 @@ export const ScormPlayer: React.FC<ScormPlayerProps> = ({
   }, [course]);
 
   useEffect(() => {
-  console.log("COURSE PASSED TO PLAYER:", course);
-}, [course]);
-
+    console.log("COURSE PASSED TO PLAYER:", course);
+  }, [course]);
 
   // ----------------------------
   // Debounced sync (important)
   // ----------------------------
-  const scheduleSync = (attemptId: string) => {
-  if (syncTimeoutRef.current) {
-    clearTimeout(syncTimeoutRef.current);
-  }
+  const scheduleSaveProgress = (pct: number) => {
+    if (pct <= lastSavedProgress.current) return;
 
-  syncTimeoutRef.current = window.setTimeout(() => {
-    console.log("Syncing courseId:", course.id);
-    console.log("Value passed to sync:", attemptId);
-    console.log("SCORM attemptId:", scormAttemptIdRef.current);
+    lastSavedProgress.current = pct;
 
-    syncCourseAttempt(attemptId)
-      .then((data) => {
-        if(data?.completionPercentage !== undefined) {
-          const pct = Math.round(data.completionPercentage);
-          setScormProgress(pct);
-          onUpdateProgressRef.current(course.id, pct, 0);
-        }
-      })
-      .catch(console.error);
-  }, 2000);
-};
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
 
+    saveTimeoutRef.current = window.setTimeout(async () => {
+      try {
+        console.log("Saving LMS progress:", pct);
+        await updateCourseAttempt(course.id, pct);
+      } catch (e) {
+        console.error("Progress save failed", e);
+      }
+    }, 1000);
+  };
+
+  const scheduleCloudSync = (attemptId: string) => {
+    if (syncTimeoutRef.current) {
+      clearTimeout(syncTimeoutRef.current);
+    }
+
+    syncTimeoutRef.current = window.setTimeout(() => {
+      syncCourseAttempt(attemptId).catch(console.error);
+    }, 5000);
+  };
+
+
+  const handleNextNavigation = () => {
+    const module = modules[activeModuleIndex];
+
+    if (activeLessonIndex < module.lessons.length - 1) {
+      setActiveLessonIndex((i) => i + 1);
+      return;
+    }
+
+    if (activeModuleIndex < modules.length - 1) {
+      setActiveModuleIndex((i) => i + 1);
+      setActiveLessonIndex(0);
+      return;
+    }
+
+    onViewCertificate();
+  };
+
+  const handleSessionEnded = async () => {
+    // console.log("[SCORM] Session ended");
+
+    const pct = lastReportedProgress.current;
+
+    try {
+      await updateCourseAttempt(course.id, pct);
+
+      if (scormAttemptIdRef.current) {
+        await syncCourseAttempt(scormAttemptIdRef.current);
+      }
+
+      await onRefreshDashboard();
+    } catch (e) {
+      console.error("Final save failed", e);
+    }
+
+    handleNextNavigation();
+  };
 
   // ----------------------------
   // Load SCORM launch URL
@@ -122,6 +187,7 @@ export const ScormPlayer: React.FC<ScormPlayerProps> = ({
         setScormAttemptId(null);
         setScormProgress(0);
         lastReportedProgress.current = 0;
+        lastSavedProgress.current = 0;
 
         const res = await fetchScormLaunchUrl(activeLesson.scormPackageId);
 
@@ -142,7 +208,12 @@ export const ScormPlayer: React.FC<ScormPlayerProps> = ({
   // Observer only – no completion logic
   // ----------------------------
   useEffect(() => {
-    const handler = (event: MessageEvent) => {
+    const handler = async (event: MessageEvent) => {
+      if (event.data?.type === "SCORM_SESSION_ENDED") {
+        await handleSessionEnded();
+        return;
+      }
+
       if (event.origin !== SCORM_ORIGIN) return;
       if (!event.data) return;
       if (!scormAttemptIdRef.current) return;
@@ -166,15 +237,14 @@ export const ScormPlayer: React.FC<ScormPlayerProps> = ({
         case "CourseProgress": {
           const pct = Math.round((data.progress || 0) * 100);
 
-          // Ignore duplicate progress events
-          if (pct === lastReportedProgress.current) return;
+          if (pct <= lastReportedProgress.current) return;
 
           lastReportedProgress.current = pct;
           setScormProgress(pct);
 
           onUpdateProgressRef.current(course.id, pct, 0);
-
-          scheduleSync(scormAttemptIdRef.current!);
+          scheduleSaveProgress(pct);
+          scheduleCloudSync(scormAttemptIdRef.current!);
           break;
         }
 
@@ -186,12 +256,25 @@ export const ScormPlayer: React.FC<ScormPlayerProps> = ({
 
           onUpdateProgressRef.current(course.id, 100, 0);
 
-          scheduleSync(scormAttemptIdRef.current!);
+          scheduleSaveProgress(100);
+          scheduleCloudSync(scormAttemptIdRef.current!);
+
+          handleNextNavigation();
+
+          if (!navigationTriggeredRef.current) {
+            navigationTriggeredRef.current = true;
+            handleNextNavigation();
+          }
           break;
         }
 
         case "PlayerExit": {
-          scheduleSync(scormAttemptIdRef.current!);
+          //const pct = lastReportedProgress.current;
+          //scheduleSaveProgress(pct);
+          //scheduleCloudSync(scormAttemptIdRef.current!);
+
+          // NOTE: Fallback if redirect-based session end doesn't work. Should be rare.
+          await handleSessionEnded();
           break;
         }
       }
@@ -199,18 +282,25 @@ export const ScormPlayer: React.FC<ScormPlayerProps> = ({
 
     window.addEventListener("message", handler);
     return () => window.removeEventListener("message", handler);
-  }, [course.id]);
+  }, [course.id, modules, activeModuleIndex, activeLessonIndex]);
 
   // ----------------------------
   // Save on tab close
   // ----------------------------
   useEffect(() => {
     const onUnload = () => {
-  if (scormAttemptIdRef.current) {
-    syncCourseAttempt(scormAttemptIdRef.current);
-  }
-};
+      const pct = lastReportedProgress.current;
 
+      if (pct > 0) {
+        navigator.sendBeacon(
+          `${BASE_URL}/attempts/${course.id}`,
+          JSON.stringify({
+            completionPercentage: pct,
+            status: pct >= 100 ? "COMPLETED" : "IN_PROGRESS",
+          }),
+        );
+      }
+    };
 
     window.addEventListener("beforeunload", onUnload);
     return () => window.removeEventListener("beforeunload", onUnload);
@@ -227,13 +317,18 @@ export const ScormPlayer: React.FC<ScormPlayerProps> = ({
         <header className="bg-white border-b px-6 py-4 flex justify-between">
           <button
             onClick={async () => {
-              if (scormAttemptIdRef.current) {
-                try {
+              const pct = lastReportedProgress.current;
+
+              try {
+                await updateCourseAttempt(course.id, pct);
+
+                if (scormAttemptIdRef.current) {
                   await syncCourseAttempt(scormAttemptIdRef.current);
-                } catch (e) {
-                  console.error("Final sync failed", e);
                 }
+              } catch (e) {
+                console.error("Final save failed", e);
               }
+
               onBack();
             }}
           >
@@ -265,20 +360,28 @@ export const ScormPlayer: React.FC<ScormPlayerProps> = ({
   return (
     <div className="fixed inset-0 flex flex-col">
       <header className="bg-slate-900 text-white px-4 py-3 flex justify-between">
-        <button onClick={() => setIsSidebarOpen(!isSidebarOpen)}>
-          <Menu size={20} />
+        <button
+          onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+          className="flex items-center gap-2"
+        >
+          <ArrowLeftCircle size={20} /> Close Sidebar
         </button>
         <div>{course.title}</div>
 
         <button
           onClick={async () => {
-            if (scormAttemptIdRef.current) {
-              try {
+            const pct = lastReportedProgress.current;
+
+            try {
+              await updateCourseAttempt(course.id, pct);
+
+              if (scormAttemptIdRef.current) {
                 await syncCourseAttempt(scormAttemptIdRef.current);
-              } catch (e) {
-                console.error("Final sync failed", e);
               }
+            } catch (e) {
+              console.error("Final save failed", e);
             }
+
             onBack();
           }}
         >
@@ -324,7 +427,7 @@ export const ScormPlayer: React.FC<ScormPlayerProps> = ({
         <main className="flex-1 bg-black">
           {loading && (
             <div className="h-full flex items-center justify-center text-white">
-              Loading SCORM...
+              Lesson loading...
             </div>
           )}
 
@@ -344,10 +447,6 @@ export const ScormPlayer: React.FC<ScormPlayerProps> = ({
           )}
         </main>
       </div>
-
-      <footer className="p-4 border-t text-sm text-gray-500 text-center">
-        Progress is tracked automatically by the course ({scormProgress}%)
-      </footer>
     </div>
   );
 };
