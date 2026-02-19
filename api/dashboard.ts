@@ -25,13 +25,32 @@ export interface RawLearnerDashboardPayload {
 }
 
 export interface LearnerDashboardViewModel {
-  courses: (Course & {
-    assignmentId: string;
-    dueDate: string | null;
-  })[];
-  learningPath: LearningPath | null;
+  courses: Course[];
   stats: UserStats;
+
+  currentCourse?: {
+    course: any | null;
+    attempt?: {
+      id: string;
+      courseId?: string | null;
+      completionPercentage?: number;
+      status?: string;
+    } | null;
+  };
+  
+  learningPath: LearningPath | null;
 }
+
+export interface RawScormScore {
+  id: string;
+  completionPercentage: number;
+  scormCloudScoreScaled: number | null;
+  displayTitle: string;
+  cloudScore?: {
+    totalSecondsTracked?: number;
+  }
+}
+
 
 /**
  * Fetch dashboard and map backend → UI-friendly shape
@@ -39,31 +58,80 @@ export interface LearnerDashboardViewModel {
 export async function fetchLearnerDashboard(): Promise<LearnerDashboardViewModel> {
   const token = getAccessToken();
 
-  const res = await fetch(
-    "https://bicmas-academy-main-backend-production.up.railway.app/api/v1/dashboard/learner",
-    {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    },
-  );
+  const [dashboardRes, scormRes] = await Promise.all([
+    fetch(
+      "https://bicmas-academy-main-backend-production.up.railway.app/api/v1/dashboard/learner",
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    ),
+    fetch(
+      "https://bicmas-academy-main-backend-production.up.railway.app/api/v1/scorm-packages/user/scorm-scores",
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    ),
+  ]);
 
-  if (!res.ok) {
+  if (!dashboardRes.ok) {
     throw new Error("Failed to load learner dashboard");
   }
 
-  const raw: RawLearnerDashboardPayload = await res.json();
+  if (!scormRes.ok) {
+    throw new Error("Failed to load SCORM scores");
+  }
 
-  const activity = raw.learningActivity || {};
+  const raw: RawLearnerDashboardPayload = await dashboardRes.json();
+  const scormJson = await scormRes.json();
 
+  const scormData = scormJson?.data ?? [];
+
+  /**
+   * Build lookup by title (case-insensitive)
+   * SCORM displayTitle ≈ course.title in assignments
+   */
+  const scormMap = new Map<
+    string,
+    {
+      completionPercentage: number;
+      scaledScore: number | null;
+      totalSeconds: number;
+    }
+  >();
+
+  scormData.forEach((item: any) => {
+    scormMap.set(item.displayTitle.toLowerCase(), {
+      completionPercentage: item.completionPercentage ?? 0,
+      scaledScore: item.scormCloudScoreScaled ?? null,
+      totalSeconds: item.cloudScore?.totalSecondsTracked ?? 0,
+    });
+  });
+
+  /**
+   * Map unfinished assignments → Course[]
+   * Progress priority:
+   * 1) SCORM progress (if matched)
+   * 2) currentCourse attempt (if same course)
+   * 3) 0
+   */
   const currentAttempt = raw.currentCourse?.attempt;
 
-  const attemptProgress =
-  raw.currentCourse?.attempt?.completionPercentage ?? 0;
+  const courses: Course[] = (raw.unfinishedCourses ?? []).map((assignment) => {
+    const titleKey = assignment.course.title.toLowerCase();
+    const scorm = scormMap.get(titleKey);
 
-  return {
-    courses: (raw.unfinishedCourses ?? []).map((assignment, index) => {
-      const progress = index === 0 ? attemptProgress : 0;
+    let progress = scorm?.completionPercentage ?? 0;
+
+    if (
+      progress === 0 &&
+      currentAttempt?.courseId === assignment.courseId
+    ) {
+      progress = currentAttempt.completionPercentage ?? 0;
+    }
 
     return {
       ...assignment.course,
@@ -77,18 +145,56 @@ export async function fetchLearnerDashboard(): Promise<LearnerDashboardViewModel
           ? CourseStatus.InProgress
           : CourseStatus.NotStarted,
     };
-  }),
+  });
+
+  /**
+   * Aggregate learning hours from SCORM time
+   */
+  const totalSeconds = scormData.reduce(
+    (sum: number, item: any) =>
+      sum + (item.cloudScore?.totalSecondsTracked ?? 0),
+    0
+  );
+
+  const totalLearningHours = Math.round(totalSeconds / 3600);
+
+  /**
+   * Average scaled score (ignore nulls)
+   */
+  const scoredItems = scormData.filter(
+    (item: any) => item.scormCloudScoreScaled != null
+  );
+
+  const averageScore =
+    scoredItems.length > 0
+      ? Math.round(
+          scoredItems.reduce(
+            (sum: number, item: any) =>
+              sum + (item.scormCloudScoreScaled ?? 0),
+            0
+          ) / scoredItems.length
+        )
+      : raw.averageScore ?? 0;
+
+  const activity = raw.learningActivity || {};
+
+  return {
+    courses,
 
     learningPath: raw.learningPaths?.[0] ?? null,
+
+    currentCourse: {
+      course: raw.currentCourse?.course ?? null,
+      attempt: raw.currentCourse?.attempt ?? null,
+    },
 
     stats: {
       streakDays: raw.streak ?? 0,
       bicmasCoins: raw.points ?? 0,
-      totalLearningHours: raw.learningHours ?? 0,
+      totalLearningHours,
       completedCourses: raw.coursesDone ?? 0,
-      averageScore: raw.averageScore ?? 0,
+      averageScore,
 
-      // Monday-first defensive mapping
       weeklyActivity: [
         activity.Mon || 0,
         activity.Tue || 0,
@@ -105,6 +211,7 @@ export async function fetchLearnerDashboard(): Promise<LearnerDashboardViewModel
     },
   };
 }
+
 
 /**
  * Sync SCORM progress, then reload dashboard

@@ -1,8 +1,26 @@
 import { Course, CourseStatus } from "@/types";
 
+function normalizeProgress(value?: number) {
+  if (typeof value !== "number") return 0;
+  return Math.min(100, Math.max(0, Math.round(value)));
+}
+
+function deriveStatus(progress: number): CourseStatus {
+  if (progress >= 100) return CourseStatus.Completed;
+  if (progress > 0) return CourseStatus.InProgress;
+  return CourseStatus.NotStarted;
+}
+
 export function mapAssignedCourse(assignment: any): Course {
   const course = assignment.course;
   const modules = course.modules ?? [];
+
+  // Single source of truth
+  const progress = normalizeProgress(
+    assignment.attempt?.completionPercentage ??
+    assignment.progress ?? 
+    0
+  );
 
   return {
     id: course.id,
@@ -11,18 +29,15 @@ export function mapAssignedCourse(assignment: any): Course {
     description: course.description ?? "",
     thumbnail: "/course-placeholder.png",
 
-    category: "Mandatory", // backend does not classify yet
-    status:
-      assignment.progress === 100
-        ? CourseStatus.Completed
-        : assignment.progress > 0
-        ? CourseStatus.InProgress
-        : CourseStatus.NotStarted,
+    category: "Mandatory",
 
-    progress: assignment.attempt?.completionPercentage ?? 0,
+    // Status derived from SAME progress value
+    status: deriveStatus(progress),
+
+    progress,
 
     totalModules: modules.length,
-    completedModules: 0, // backend does not provide this yet
+    completedModules: 0,
 
     deadline: assignment.dueDate,
     isDownloaded: false,

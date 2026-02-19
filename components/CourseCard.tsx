@@ -17,7 +17,8 @@ export const CourseCard: React.FC<CourseCardProps> = ({
   onRemoveDownload,
   isOfflineMode,
 }) => {
-  const isCompleted = course.status === CourseStatus.Completed;
+  const progress = Math.min(100, Math.max(0, course.progress ?? 0))
+  const isCompleted = progress === 100;
   const isDisabled = isOfflineMode && !course.isDownloaded;
 
   const handleDownload = async (e: React.MouseEvent) => {
@@ -72,11 +73,11 @@ export const CourseCard: React.FC<CourseCardProps> = ({
           <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
             <div
               className={`h-full rounded-full transition-all duration-500 ${isCompleted ? "bg-green-500" : "bg-blue-600"}`}
-              style={{ width: `${course.progress}%` }}
+              style={{ width: `${progress}%` }}
             />
           </div>
           <div className="flex justify-between text-xs text-slate-500">
-            <span>{course.progress}% Complete</span>
+            <span>{progress}% Complete</span>
             {course.deadline && (
               <span>
                 Due: {new Date(course.deadline!).toLocaleDateString()}

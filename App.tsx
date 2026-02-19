@@ -38,10 +38,21 @@ const DEFAULT_STATS: UserStats = {
   bicmasCoins: 0,
   completedCourses: 0,
   averageScore: 0,
-  weeklyActivity: [],
+  weeklyActivity: [0, 0, 0, 0, 0, 0, 0],
   scoreTrend: 0,
   completedCoursesTrend: 0,
   badges: [],
+};
+
+const normalizeProgress = (progress?: number) => {
+  if (typeof progress !== "number") return 0;
+  return Math.min(100, Math.max(0, Math.round(progress)));
+};
+
+const deriveStatus = (progress: number): CourseStatus => {
+  if (progress >= 100) return CourseStatus.Completed;
+  if (progress > 0) return CourseStatus.InProgress;
+  return CourseStatus.NotStarted;
 };
 
 const updateCourseProgress = (
@@ -49,13 +60,20 @@ const updateCourseProgress = (
   courseId: string,
   progress: number,
   completedModules: number,
-): Course[] =>
-  courses.map((c) => {
+): Course[] => {
+  const safeProgress = normalizeProgress(progress);
+  const status = deriveStatus(safeProgress);
+
+  return courses.map((c) => {
     if (c.id !== courseId) return c;
-    const status =
-      progress === 100 ? CourseStatus.Completed : CourseStatus.InProgress;
-    return { ...c, progress, completedModules, status };
+    return {
+      ...c,
+      progress: safeProgress,
+      completedModules,
+      status,
+    };
   });
+};
 
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -80,6 +98,8 @@ export default function App() {
     null,
   );
 
+  const [activeAttempt, setActiveAttempt] = useState<any | null>(null);
+
   // Filters for Library
   const [filter, setFilter] = useState<LibraryFilter>("ALL");
   const [search, setSearch] = useState("");
@@ -91,14 +111,16 @@ export default function App() {
 
   const refreshDashboard = async () => {
     if (!isAuthenticated || !user) return;
-
     try {
       const [dashboard, paths] = await Promise.all([
         fetchLearnerDashboard(),
         fetchLearningPaths(),
       ]);
 
+      setActiveAttempt(dashboard.currentCourse?.attempt ?? null);
+
       setDashboardCourses(dashboard.courses);
+
       setStats(dashboard.stats);
 
       const publishedPath = paths.find((p) => p.status === "PUBLISHED");
@@ -164,10 +186,24 @@ export default function App() {
         const downloadedIds = getDownloadedCourses();
 
         setLibraryCourses(
-          assignments.map(mapAssignedCourse).map((course) => ({
-            ...course,
-            isDownloaded: downloadedIds.includes(course.id),
-          })),
+          assignments
+            .map(mapAssignedCourse)
+            .map((course) => {
+              const dashboardMatch = dashboardCourses.find(
+                (c) => c.id === course.id
+              )
+
+              const progress = normalizeProgress(
+                dashboardMatch?.progress ?? course.progress ?? 0
+              )
+
+              return {
+                ...course,
+                progress,
+                status: deriveStatus(progress),
+                isDownloaded: downloadedIds.includes(course.id),
+              }
+            })
         );
       } catch (err) {
         console.error("Assigned courses load failed:", err);
@@ -177,7 +213,7 @@ export default function App() {
     };
 
     loadLibrary();
-  }, [isAuthenticated, user]);
+  }, [isAuthenticated, user, activeAttempt]);
 
   useEffect(() => {
     if (!isAuthenticated || !user) return;
@@ -237,16 +273,24 @@ export default function App() {
     console.log("Library after update:", progress, courseId);
 
     // Refresh stats when course completes
-    if (progress >= 100) {
+    if (normalizeProgress(progress) === 100) {
       try {
         const dashboard = await fetchLearnerDashboard();
-        setStats(dashboard.stats);
         setDashboardCourses(dashboard.courses);
+        setStats(dashboard.stats);
+        setActiveAttempt(dashboard.currentCourse?.attempt ?? null);
+
       } catch (err) {
         console.error("Failed to refresh dashboard stats", err);
       }
     }
   };
+
+
+
+
+
+
 
   const toggleDownloadFlag = (
     courses: Course[],
@@ -255,8 +299,6 @@ export default function App() {
   ) => courses.map((c) => (c.id === courseId ? { ...c, isDownloaded } : c));
 
   const downloadCourseAssets = async (courseId: string) => {
-    // Placeholder for real asset caching later
-    // Example: fetch SCORM zip, videos, etc.
     await new Promise((res) => setTimeout(res, 500));
 
     markDownloaded(courseId);
@@ -299,7 +341,7 @@ export default function App() {
       }
 
       if (filter === "COMPLETED") {
-        return course.progress === 100;
+        return course.status === CourseStatus.Completed;
       }
 
       if (filter === "MANDATORY") {

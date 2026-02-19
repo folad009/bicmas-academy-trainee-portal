@@ -10,6 +10,7 @@ import {
   ArrowBigLeft,
   ArrowLeft,
   ArrowLeftCircle,
+  CheckCircle,
 } from "lucide-react";
 import { mapCourseToPlayerModules } from "@/mappers/mapCourseToPlayerModules";
 import { fetchScormLaunchUrl } from "@/api/scorm";
@@ -45,7 +46,6 @@ export const ScormPlayer: React.FC<ScormPlayerProps> = ({
 
   const navigationTriggeredRef = useRef(false);
 
-
   const [modules, setModules] = useState<PlayerModule[]>([]);
 
   const [activeModuleIndex, setActiveModuleIndex] = useState(0);
@@ -75,6 +75,10 @@ export const ScormPlayer: React.FC<ScormPlayerProps> = ({
 
   const lastSavedProgress = useRef<number>(0);
   const saveTimeoutRef = useRef<number | null>(null);
+
+  const [completedModules, setCompletedModules] = useState<Set<string>>(
+    new Set(),
+  );
 
   useEffect(() => {
     if (!course?.modules) {
@@ -135,14 +139,28 @@ export const ScormPlayer: React.FC<ScormPlayerProps> = ({
     }, 5000);
   };
 
+  const markModuleCompletedIfFinished = (moduleIndex: number) => {
+    const module = modules[moduleIndex];
+    if (!module) return;
+
+    setCompletedModules((prev) => {
+      if (prev.has(module.id)) return prev;
+      const next = new Set(prev);
+      next.add(module.id);
+      return next;
+    });
+  };
 
   const handleNextNavigation = () => {
     const module = modules[activeModuleIndex];
+    if (!module) return;
 
     if (activeLessonIndex < module.lessons.length - 1) {
       setActiveLessonIndex((i) => i + 1);
       return;
     }
+
+    markModuleCompletedIfFinished(activeModuleIndex);
 
     if (activeModuleIndex < modules.length - 1) {
       setActiveModuleIndex((i) => i + 1);
@@ -151,6 +169,14 @@ export const ScormPlayer: React.FC<ScormPlayerProps> = ({
     }
 
     onViewCertificate();
+  };
+
+  const goToModule = (moduleIndex: number, lessonIndex: number) => {
+    if (moduleIndex > activeModuleIndex) {
+      markModuleCompletedIfFinished(activeModuleIndex);
+    }
+    setActiveModuleIndex(moduleIndex);
+    setActiveLessonIndex(lessonIndex);
   };
 
   const handleSessionEnded = async () => {
@@ -259,8 +285,6 @@ export const ScormPlayer: React.FC<ScormPlayerProps> = ({
           scheduleSaveProgress(100);
           scheduleCloudSync(scormAttemptIdRef.current!);
 
-          handleNextNavigation();
-
           if (!navigationTriggeredRef.current) {
             navigationTriggeredRef.current = true;
             handleNextNavigation();
@@ -284,6 +308,10 @@ export const ScormPlayer: React.FC<ScormPlayerProps> = ({
     return () => window.removeEventListener("message", handler);
   }, [course.id, modules, activeModuleIndex, activeLessonIndex]);
 
+  useEffect(() => {
+    navigationTriggeredRef.current = false;
+  }, [activeLesson]);
+
   // ----------------------------
   // Save on tab close
   // ----------------------------
@@ -306,7 +334,14 @@ export const ScormPlayer: React.FC<ScormPlayerProps> = ({
     return () => window.removeEventListener("beforeunload", onUnload);
   }, [course.id]);
 
-  const isCourseCompleted = scormProgress >= 100;
+  const isLastModule = activeModuleIndex === modules.length - 1;
+
+  const isLastLesson =
+    modules[activeModuleIndex] &&
+    activeLessonIndex === modules[activeModuleIndex].lessons.length - 1;
+
+  const isCourseCompleted =
+    isLastModule && isLastLesson && scormProgress === 100;
 
   // ----------------------------
   // Completion screen
@@ -398,15 +433,17 @@ export const ScormPlayer: React.FC<ScormPlayerProps> = ({
           ) : (
             modules.map((m, moduleIndex) => (
               <div key={m.id}>
-                <div className="font-semibold px-3 py-2">{m.title}</div>
+                <div className="font-semibold px-3 py-2 flex justify-between">
+                  {m.title}
+                  {completedModules.has(m.id) && (
+                    <CheckCircle size={16} className="text-green-500" />
+                  )}
+                </div>
 
                 {m.lessons.map((l, lessonIndex) => (
                   <button
                     key={l.id}
-                    onClick={() => {
-                      setActiveModuleIndex(moduleIndex);
-                      setActiveLessonIndex(lessonIndex);
-                    }}
+                    onClick={() => goToModule(moduleIndex, lessonIndex)}
                     className={`block w-full text-left px-6 py-2 flex items-center gap-2 hover:bg-slate-100 text-[15px]
               ${
                 moduleIndex === activeModuleIndex &&
