@@ -175,45 +175,49 @@ export default function App() {
     };
   }, [pendingSync]);
 
-  useEffect(() => {
-    if (!isAuthenticated || !user) return;
+ useEffect(() => {
+  if (!isAuthenticated || !user) return;
 
-    const loadLibrary = async () => {
-      try {
-        setIsLibraryLoading(true);
+  // Wait until dashboard data exists
+  if (dashboardCourses.length === 0) return;
 
-        const assignments = await fetchAssignedCourses();
-        const downloadedIds = getDownloadedCourses();
+  const loadLibrary = async () => {
+    try {
+      setIsLibraryLoading(true);
 
-        setLibraryCourses(
-          assignments
-            .map(mapAssignedCourse)
-            .map((course) => {
-              const dashboardMatch = dashboardCourses.find(
-                (c) => c.id === course.id
-              )
+      const assignments = await fetchAssignedCourses();
+      const downloadedIds = getDownloadedCourses();
 
-              const progress = normalizeProgress(
-                dashboardMatch?.progress ?? course.progress ?? 0
-              )
+      setLibraryCourses(
+        assignments
+          .map(mapAssignedCourse)
+          .map((course) => {
+            const dashboardMatch = dashboardCourses.find(
+              (c) => c.id === course.id
+            );
 
-              return {
-                ...course,
-                progress,
-                status: deriveStatus(progress),
-                isDownloaded: downloadedIds.includes(course.id),
-              }
-            })
-        );
-      } catch (err) {
-        console.error("Assigned courses load failed:", err);
-      } finally {
-        setIsLibraryLoading(false);
-      }
-    };
+            const progress = normalizeProgress(
+              dashboardMatch?.progress ?? 0
+            );
 
-    loadLibrary();
-  }, [isAuthenticated, user, activeAttempt]);
+            return {
+              ...course,
+              progress,
+              status: deriveStatus(progress),
+              isDownloaded: downloadedIds.includes(course.id),
+            };
+          })
+      );
+    } catch (err) {
+      console.error("Assigned courses load failed:", err);
+    } finally {
+      setIsLibraryLoading(false);
+    }
+  };
+
+  loadLibrary();
+}, [isAuthenticated, user, dashboardCourses]);
+
 
   useEffect(() => {
     if (!isAuthenticated || !user) return;
@@ -279,18 +283,11 @@ export default function App() {
         setDashboardCourses(dashboard.courses);
         setStats(dashboard.stats);
         setActiveAttempt(dashboard.currentCourse?.attempt ?? null);
-
       } catch (err) {
         console.error("Failed to refresh dashboard stats", err);
       }
     }
   };
-
-
-
-
-
-
 
   const toggleDownloadFlag = (
     courses: Course[],

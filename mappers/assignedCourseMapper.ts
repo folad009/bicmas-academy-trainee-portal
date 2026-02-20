@@ -17,13 +17,11 @@ export function mapAssignedCourse(assignment: any): Course {
 
   // Single source of truth
   const progress = normalizeProgress(
-    assignment.attempt?.completionPercentage ??
-    assignment.progress ?? 
-    0
+    assignment.attempt?.completionPercentage ?? assignment.progress ?? 0,
   );
 
   return {
-    id: course.id,
+    id: assignment.course.id,
 
     title: course.title,
     description: course.description ?? "",

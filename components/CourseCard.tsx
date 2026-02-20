@@ -1,6 +1,13 @@
 import React from "react";
 import { Course, CourseStatus } from "../types";
-import { Play, CheckCircle, Download, Trash2, Award, Clock } from "lucide-react";
+import {
+  Play,
+  CheckCircle,
+  Download,
+  Trash2,
+  Award,
+  Clock,
+} from "lucide-react";
 
 interface CourseCardProps {
   course: Course;
@@ -17,7 +24,7 @@ export const CourseCard: React.FC<CourseCardProps> = ({
   onRemoveDownload,
   isOfflineMode,
 }) => {
-  const progress = Math.min(100, Math.max(0, course.progress ?? 0))
+  const progress = Math.round(Math.min(100, Math.max(0, course.progress ?? 0)));
   const isCompleted = progress === 100;
   const isDisabled = isOfflineMode && !course.isDownloaded;
 
@@ -91,9 +98,9 @@ export const CourseCard: React.FC<CourseCardProps> = ({
               disabled={isDisabled}
               className={`text-sm font-medium ${isDisabled ? "cursor-not-allowed" : "text-blue-600 hover:text-blue-700"}`}
             >
-              {course.progress === 100
+              {progress === 100
                 ? "Completed"
-                : course.progress > 0
+                : progress > 0
                   ? "Resume"
                   : "Start Course"}
             </button>
@@ -123,11 +130,7 @@ export const CourseCard: React.FC<CourseCardProps> = ({
                   title="Download for Offline"
                   disabled={isOfflineMode} // Cannot download while offline
                 >
-                 {isOfflineMode ? (
-                    <Clock size={16} />
-                  ) : (
-                    <Download size={16} />
-                  )}
+                  {isOfflineMode ? <Clock size={16} /> : <Download size={16} />}
                 </button>
               )}
             </div>
