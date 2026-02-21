@@ -29,6 +29,7 @@ export interface Course {
   isDownloaded: boolean;
   modules: PlayerModule[];
   certificateUrl?: string;
+  scormPackageId?: string;
 }
 
 export interface User {

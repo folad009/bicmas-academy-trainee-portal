@@ -14,7 +14,8 @@ import {
 } from "lucide-react";
 import { mapCourseToPlayerModules } from "@/mappers/mapCourseToPlayerModules";
 import { fetchScormLaunchUrl } from "@/api/scorm";
-import { syncCourseAttempt, updateCourseAttempt } from "@/api/attempts";
+import { useAttemptSync } from "@/hooks/useAttemptSync";
+
 
 const BASE_URL =
   "https://bicmas-academy-main-backend-production.up.railway.app/api/v1";
@@ -38,7 +39,6 @@ export const ScormPlayer: React.FC<ScormPlayerProps> = ({
   onBack,
   onUpdateProgress,
   onViewCertificate,
-  onRefreshDashboard,
 }) => {
   // ----------------------------
   // Course structure (navigation only)
@@ -79,6 +79,9 @@ export const ScormPlayer: React.FC<ScormPlayerProps> = ({
   const [completedModules, setCompletedModules] = useState<Set<string>>(
     new Set(),
   );
+
+  const syncAttempt = useAttemptSync();
+
 
   useEffect(() => {
     if (!course?.modules) {
@@ -121,8 +124,6 @@ export const ScormPlayer: React.FC<ScormPlayerProps> = ({
 
     saveTimeoutRef.current = window.setTimeout(async () => {
       try {
-        console.log("Saving LMS progress:", pct);
-        await updateCourseAttempt(course.id, pct);
       } catch (e) {
         console.error("Progress save failed", e);
       }
@@ -135,7 +136,7 @@ export const ScormPlayer: React.FC<ScormPlayerProps> = ({
     }
 
     syncTimeoutRef.current = window.setTimeout(() => {
-      syncCourseAttempt(attemptId).catch(console.error);
+      syncAttempt(attemptId).catch(console.error);
     }, 5000);
   };
 
@@ -185,13 +186,9 @@ export const ScormPlayer: React.FC<ScormPlayerProps> = ({
     const pct = lastReportedProgress.current;
 
     try {
-      await updateCourseAttempt(course.id, pct);
-
       if (scormAttemptIdRef.current) {
-        await syncCourseAttempt(scormAttemptIdRef.current);
+        await syncAttempt(scormAttemptIdRef.current);
       }
-
-      await onRefreshDashboard();
     } catch (e) {
       console.error("Final save failed", e);
     }
@@ -355,10 +352,8 @@ export const ScormPlayer: React.FC<ScormPlayerProps> = ({
               const pct = lastReportedProgress.current;
 
               try {
-                await updateCourseAttempt(course.id, pct);
-
                 if (scormAttemptIdRef.current) {
-                  await syncCourseAttempt(scormAttemptIdRef.current);
+                  await syncAttempt(scormAttemptIdRef.current);
                 }
               } catch (e) {
                 console.error("Final save failed", e);
@@ -408,10 +403,8 @@ export const ScormPlayer: React.FC<ScormPlayerProps> = ({
             const pct = lastReportedProgress.current;
 
             try {
-              await updateCourseAttempt(course.id, pct);
-
               if (scormAttemptIdRef.current) {
-                await syncCourseAttempt(scormAttemptIdRef.current);
+                await syncAttempt(scormAttemptIdRef.current);
               }
             } catch (e) {
               console.error("Final save failed", e);

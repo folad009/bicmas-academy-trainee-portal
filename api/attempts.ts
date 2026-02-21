@@ -79,7 +79,16 @@ export const syncScormProgress = async (attemptId: string) => {
  * 2. Update local attempt if backend returns percentage
  */
 export const syncCourseAttempt = async (attemptId: string) => {
-  const scormRes = await syncScormProgress(attemptId);
-  return scormRes?.data;
-};
+  const res = await syncScormProgress(attemptId)
 
+  if(!res?.data) {
+    throw new Error("No attempt data returned from sync");
+  }
+
+  return {
+    attemptId: res.data.attemptId,
+    scormPackageId: res.data.attempt?.scormPackageId,
+    completionPercentage: res.data.completionPercentage ?? 0,
+    status: res.data.status as AttemptStatus,
+  }
+};

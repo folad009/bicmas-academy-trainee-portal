@@ -15,23 +15,27 @@ export function mapAssignedCourse(assignment: any): Course {
   const course = assignment.course;
   const modules = course.modules ?? [];
 
-  // Single source of truth
   const progress = normalizeProgress(
     assignment.attempt?.completionPercentage ?? assignment.progress ?? 0,
   );
 
+  // 🔑 Extract a course-level scormPackageId
+  const scormPackageId =
+    modules
+      ?.flatMap((m: any) => m.lessons ?? [])
+      ?.find((l: any) => l.scormPackageId)
+      ?.scormPackageId ?? null;
+
   return {
     id: assignment.course.id,
+    scormPackageId, // <-- CRITICAL
 
     title: course.title,
     description: course.description ?? "",
     thumbnail: "/course-placeholder.png",
 
     category: "Mandatory",
-
-    // Status derived from SAME progress value
     status: deriveStatus(progress),
-
     progress,
 
     totalModules: modules.length,
@@ -51,3 +55,4 @@ export function mapAssignedCourse(assignment: any): Course {
     })),
   };
 }
+

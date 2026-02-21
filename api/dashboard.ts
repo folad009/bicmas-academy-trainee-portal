@@ -62,28 +62,19 @@ export async function fetchLearnerDashboard(): Promise<LearnerDashboardViewModel
     fetch(
       "https://bicmas-academy-main-backend-production.up.railway.app/api/v1/dashboard/learner",
       {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
       }
     ),
     fetch(
       "https://bicmas-academy-main-backend-production.up.railway.app/api/v1/scorm-packages/user/scorm-scores",
       {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
       }
     ),
   ]);
 
-  if (!dashboardRes.ok) {
-    throw new Error("Failed to load learner dashboard");
-  }
-
-  if (!scormRes.ok) {
-    throw new Error("Failed to load SCORM scores");
-  }
+  if (!dashboardRes.ok) throw new Error("Failed to load learner dashboard");
+  if (!scormRes.ok) throw new Error("Failed to load SCORM scores");
 
   const raw: RawLearnerDashboardPayload = await dashboardRes.json();
   const scormJson = await scormRes.json();
@@ -91,8 +82,9 @@ export async function fetchLearnerDashboard(): Promise<LearnerDashboardViewModel
   const scormData = scormJson?.data ?? [];
 
   /**
-   * Build lookup by title (case-insensitive)
-   * SCORM displayTitle ≈ course.title in assignments
+   * ---------------------------------------------------
+   * 1) Build SCORM lookup by PACKAGE ID (single truth)
+   * ---------------------------------------------------
    */
   const scormMap = new Map<
     string,
@@ -104,7 +96,7 @@ export async function fetchLearnerDashboard(): Promise<LearnerDashboardViewModel
   >();
 
   scormData.forEach((item: any) => {
-    scormMap.set(item.displayTitle.toLowerCase(), {
+    scormMap.set(item.scormPackageId, {
       completionPercentage: item.completionPercentage ?? 0,
       scaledScore: item.scormCloudScoreScaled ?? null,
       totalSeconds: item.cloudScore?.totalSecondsTracked ?? 0,
@@ -112,31 +104,65 @@ export async function fetchLearnerDashboard(): Promise<LearnerDashboardViewModel
   });
 
   /**
-   * Map unfinished assignments → Course[]
-   * Progress priority:
-   * 1) SCORM progress (if matched)
-   * 2) currentCourse attempt (if same course)
-   * 3) 0
+   * ---------------------------------------------------
+   * 2) Helper: extract course-level packageId
+   * (because backend doesn't provide it)
+   * ---------------------------------------------------
+   */
+  const getCourseScormPackageId = (course: any): string | null => {
+    if (!course?.modules) return null;
+
+    for (const module of course.modules) {
+      for (const lesson of module.lessons ?? []) {
+        if (lesson.scormPackageId) {
+          return lesson.scormPackageId;
+        }
+      }
+    }
+
+    return null;
+  };
+
+  /**
+   * ---------------------------------------------------
+   * 3) Current attempt fallback
+   * ---------------------------------------------------
    */
   const currentAttempt = raw.currentCourse?.attempt;
 
+  /**
+   * ---------------------------------------------------
+   * 4) Map assignments → Courses
+   * Priority:
+   *   SCORM score
+   *   → current attempt
+   *   → 0
+   * ---------------------------------------------------
+   */
   const courses: Course[] = (raw.unfinishedCourses ?? []).map((assignment) => {
-    const titleKey = assignment.course.title.toLowerCase();
-    const scorm = scormMap.get(titleKey);
+    const course = assignment.course;
 
-    let progress = scorm?.completionPercentage ?? 0;
+    const scormPackageId = getCourseScormPackageId(course);
 
+    // Primary source: SCORM scores
+    let progress = scormPackageId
+      ? scormMap.get(scormPackageId)?.completionPercentage ?? 0
+      : 0;
+
+    // Fallback: current active attempt
     if (
       progress === 0 &&
-      currentAttempt?.courseId === assignment.courseId
+      currentAttempt?.scormPackageId &&
+      currentAttempt.scormPackageId === scormPackageId
     ) {
       progress = currentAttempt.completionPercentage ?? 0;
     }
 
     return {
-      ...assignment.course,
+      ...course,
       assignmentId: assignment.id,
       dueDate: assignment.dueDate,
+      scormPackageId,
       progress,
       status:
         progress >= 100
@@ -148,7 +174,9 @@ export async function fetchLearnerDashboard(): Promise<LearnerDashboardViewModel
   });
 
   /**
-   * Aggregate learning hours from SCORM time
+   * ---------------------------------------------------
+   * 5) Stats from SCORM data
+   * ---------------------------------------------------
    */
   const totalSeconds = scormData.reduce(
     (sum: number, item: any) =>
@@ -158,9 +186,6 @@ export async function fetchLearnerDashboard(): Promise<LearnerDashboardViewModel
 
   const totalLearningHours = Math.round(totalSeconds / 3600);
 
-  /**
-   * Average scaled score (ignore nulls)
-   */
   const scoredItems = scormData.filter(
     (item: any) => item.scormCloudScoreScaled != null
   );
@@ -178,6 +203,11 @@ export async function fetchLearnerDashboard(): Promise<LearnerDashboardViewModel
 
   const activity = raw.learningActivity || {};
 
+  /**
+   * ---------------------------------------------------
+   * 6) Final ViewModel
+   * ---------------------------------------------------
+   */
   return {
     courses,
 
@@ -185,7 +215,7 @@ export async function fetchLearnerDashboard(): Promise<LearnerDashboardViewModel
 
     currentCourse: {
       course: raw.currentCourse?.course ?? null,
-      attempt: raw.currentCourse?.attempt ?? null,
+      attempt: currentAttempt ?? null,
     },
 
     stats: {
@@ -213,16 +243,17 @@ export async function fetchLearnerDashboard(): Promise<LearnerDashboardViewModel
 }
 
 
+
 /**
  * Sync SCORM progress, then reload dashboard
  */
 export async function syncProgressAndRefresh(
-  progressId: string,
+  attemptId: string,
 ): Promise<LearnerDashboardViewModel> {
   const token = getAccessToken();
 
   const res = await fetch(
-    `https://bicmas-academy-main-backend-production.up.railway.app/api/v1/attempts/${progressId}/sync-progress`,
+    `https://bicmas-academy-main-backend-production.up.railway.app/api/v1/attempts/${attemptId}/sync-progress`,
     {
       method: "PATCH",
       headers: {
