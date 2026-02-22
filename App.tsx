@@ -16,6 +16,7 @@ import { useDashboard } from "@/hooks/useDashboard";
 import { useLibrary } from "@/hooks/useLibrary";
 import { useOfflineStatus } from "@/hooks/useOfflineStatus";
 import { useProgressUpdate } from "@/hooks/useProgressUpdate";
+import { FieldAssessmentPage } from "./components/FieldAssessment";
 
 type LibraryFilter = "ALL" | "MANDATORY" | "RECOMMENDED" | "COMPLETED";
 
@@ -60,16 +61,6 @@ export default function App() {
   const { data: dashboardData, isLoading: isDashboardLoading } = useDashboard();
 
   const dashboardCourses = dashboardData?.courses ?? [];
-console.log(
-  "DASHBOARD COURSES",
-  dashboardCourses.map(c => ({
-    id: c.id,
-    scormPackageId: c.scormPackageId,
-    progress: c.progress,
-    status: c.status
-  }))
-);
-
   const stats = dashboardData?.stats ?? DEFAULT_STATS;
 
   const { data: libraryCoursesRaw = [] } = useLibrary(dashboardCourses);
@@ -289,6 +280,7 @@ console.log(
           ))}
 
         {activeView === "library" && renderLibrary()}
+        {activeView === "assessment" && <FieldAssessmentPage userId={user.id} />}
         {activeView === "community" && <Community user={user} />}
         {activeView === "profile" && renderProfile()}
       </Layout>
