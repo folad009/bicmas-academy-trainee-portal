@@ -28,26 +28,9 @@ export const useLibrary = (dashboardCourses: Course[]) => {
     enabled: dashboardCourses.length > 0,
     select: (assignments) => {
       const downloadedIds = getDownloadedCourses();
-      console.log("LIBRARY: dashboard snapshot", dashboardCourses);
       return assignments.map(mapAssignedCourse).map((course) => {
-        const match = dashboardCourses.find(
-          (c) => c.scormPackageId === course.scormPackageId,
-        );
-
-        console.log("MATCH CHECK", {
-          libraryCourse: {
-            id: course.id,
-            scormPackageId: course.scormPackageId,
-          },
-          matchedDashboard: match
-            ? {
-                id: match.id,
-                scormPackageId: match.scormPackageId,
-                progress: match.progress,
-              }
-            : null,
-        });
-
+        const match = dashboardCourses.find((c) => c.id === course.id);
+        
         const progress = normalizeProgress(match?.progress ?? 0);
 
         return {

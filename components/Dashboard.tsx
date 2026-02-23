@@ -320,15 +320,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </div>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-          <InsightCard
-            label="Day Streak"
-            value={stats.streakDays}
-            icon={Flame}
-            color={{ bg: "bg-orange-500", text: "text-orange-500" }}
-            trend="Keeping it up!"
-            trendDirection="up"
-          />
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+         
           <InsightCard
             label="BICMAS Coins"
             value={stats.bicmasCoins}
@@ -437,6 +430,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   <CourseCard
                     key={course.id}
                     course={course}
+                    progress={course.progress}
+                    status={course.status}
                     onStart={onStartCourse}
                     onDownload={onDownload}
                     onRemoveDownload={onRemoveDownload}

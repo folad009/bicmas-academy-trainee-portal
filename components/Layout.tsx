@@ -96,7 +96,7 @@ export const Layout: React.FC<LayoutProps> = ({
         <nav className="flex-1 flex flex-col gap-6 w-full px-2">
           <NavItem id="dashboard" icon={LayoutDashboard} label="Home" />
           <NavItem id="library" icon={BookOpen} label="Courses" />
-          <NavItem id="assessment" icon={Camera} label="Field Assessment" />
+          <NavItem id="assessment" icon={Camera} label="Field Task" />
           <NavItem id="community" icon={MessageCircle} label="Forum" />
           <NavItem id="certificates" icon={Award} label="Awards" />
           <NavItem id="profile" icon={UserCircle} label="Profile" />
@@ -128,7 +128,7 @@ export const Layout: React.FC<LayoutProps> = ({
           <h1 className="text-xl font-bold text-slate-800">
             {activeView === "dashboard" && "My Dashboard"}
             {activeView === "library" && "Course Library"}
-            {activeView === "assessment" && "Field Assessment"}
+            {activeView === "assessment" && "Field Task"}
             {activeView === "certificates" && "My Certificates"}
             {activeView === "profile" && "User Profile"}
             {activeView === "community" && "Community"}

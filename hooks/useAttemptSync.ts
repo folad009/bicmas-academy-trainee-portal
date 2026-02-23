@@ -11,21 +11,20 @@ const mapStatus = (status: string, pct: number): CourseStatus => {
 export const useAttemptSync = () => {
   const queryClient = useQueryClient();
 
-  const syncAttempt = async (attemptId: string) => {
+  const syncAttempt = async (attemptId: string, courseId: string) => {
     const data = await syncCourseAttempt(attemptId);
 
     const pct = data.completionPercentage ?? 0;
     const status = data.status;
-    const scormPackageId = data.scormPackageId;
 
-    // Update dashboard cache
+    // Update dashboard cache immediately (single source of truth)
     queryClient.setQueryData(["dashboard"], (old: any) => {
       if (!old?.courses) return old;
 
       return {
         ...old,
         courses: old.courses.map((course: any) => {
-          if (course.scormPackageId !== scormPackageId) return course;
+          if (course.id !== courseId) return course;
 
           return {
             ...course,
@@ -36,8 +35,10 @@ export const useAttemptSync = () => {
       };
     });
 
-    // Library derives from dashboard
-    queryClient.invalidateQueries({ queryKey: ["assignedCourses"] });
+    // ❗ Do NOT invalidate immediately
+    // Backend may still be stale
+
+    return data;
   };
 
   return syncAttempt;

@@ -10,7 +10,11 @@ import { Search, Download, LogOut, Filter } from "lucide-react";
 import { CourseCard } from "./components/CourseCard";
 
 import { clearAuth, getAccessToken } from "./utils/auth";
-import { getDownloadedCourses, markDownloaded, removeDownloaded } from "./utils/offlineCourses";
+import {
+  getDownloadedCourses,
+  markDownloaded,
+  removeDownloaded,
+} from "./utils/offlineCourses";
 
 import { useDashboard } from "@/hooks/useDashboard";
 import { useLibrary } from "@/hooks/useLibrary";
@@ -47,7 +51,9 @@ export default function App() {
   // ---------------- UI State ----------------
   const [activeView, setActiveView] = useState("dashboard");
   const [activeCourseId, setActiveCourseId] = useState<string | null>(null);
-  const [selectedCertificate, setSelectedCertificate] = useState<Course | null>(null);
+  const [selectedCertificate, setSelectedCertificate] = useState<Course | null>(
+    null,
+  );
 
   // Library UI controls
   const [filter, setFilter] = useState<LibraryFilter>("ALL");
@@ -136,7 +142,7 @@ export default function App() {
   const handleUpdateProgress = (
     courseId: string,
     progress: number,
-    completedModules: number
+    completedModules: number,
   ) => {
     updateProgress(courseId, progress, completedModules);
   };
@@ -151,6 +157,8 @@ export default function App() {
     removeDownloaded(courseId);
   };
 
+  console.log("DASHBOARD COURSES", dashboardCourses);
+  
   // ---------------- Views ----------------
   const renderLibrary = () => (
     <div className="space-y-6">
@@ -200,6 +208,8 @@ export default function App() {
             <CourseCard
               key={course.id}
               course={course}
+              progress={course.progress}
+              status={course.status}
               onStart={handleStartCourse}
               onDownload={handleDownload}
               onRemoveDownload={handleRemoveDownload}
@@ -280,7 +290,9 @@ export default function App() {
           ))}
 
         {activeView === "library" && renderLibrary()}
-        {activeView === "assessment" && <FieldAssessmentPage userId={user.id} />}
+        {activeView === "assessment" && (
+          <FieldAssessmentPage userId={user.id} />
+        )}
         {activeView === "community" && <Community user={user} />}
         {activeView === "profile" && renderProfile()}
       </Layout>

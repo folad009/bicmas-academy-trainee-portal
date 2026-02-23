@@ -11,38 +11,130 @@ import {
 
 interface CourseCardProps {
   course: Course;
-  onStart: (courseId: string) => void;
-  onDownload: (courseId: string) => void;
-  onRemoveDownload: (courseId: string) => void;
+  progress: number;
+  status?: CourseStatus | string | null;
+  onStart: (id: string) => void;
+  onDownload: (id: string) => void;
+  onRemoveDownload: (id: string) => void;
   isOfflineMode: boolean;
 }
 
+/**
+ * ---------------------------------------
+ * Normalize incoming status safely
+ * React Query + backend + SCORM can send:
+ * - undefined
+ * - null
+ * - "IN_PROGRESS"
+ * - enum value
+ * ---------------------------------------
+ */
+const normalizeStatus = (
+  rawStatus: any,
+  progress: number
+): CourseStatus => {
+  // Progress is the strongest signal
+  if (progress >= 100) return CourseStatus.Completed;
+  if (progress > 0) return CourseStatus.InProgress;
+
+  // Backend strings
+  if (rawStatus === "COMPLETED") return CourseStatus.Completed;
+  if (rawStatus === "IN_PROGRESS") return CourseStatus.InProgress;
+
+  // Frontend enum values
+  if (rawStatus === CourseStatus.Completed) return CourseStatus.Completed;
+  if (rawStatus === CourseStatus.InProgress) return CourseStatus.InProgress;
+  if (rawStatus === CourseStatus.NotStarted) return CourseStatus.NotStarted;
+
+  return CourseStatus.NotStarted;
+};
+
 export const CourseCard: React.FC<CourseCardProps> = ({
   course,
+  progress,
+  status,
   onStart,
   onDownload,
   onRemoveDownload,
   isOfflineMode,
 }) => {
-  const progress = Math.round(Math.min(100, Math.max(0, course.progress ?? 0)));
-  const isCompleted = progress === 100;
+  // ----------------------------
+  // Safe derived values
+  // ----------------------------
+  const normalizedProgress = Math.round(
+    Math.min(100, Math.max(0, progress || 0))
+  );
+
+  const safeStatus = normalizeStatus(status, normalizedProgress);
+
+  const isCompleted = safeStatus === CourseStatus.Completed;
   const isDisabled = isOfflineMode && !course.isDownloaded;
+
+  // ----------------------------
+  // Status UI (always safe now)
+  // ----------------------------
+  const statusConfig: Record<
+    CourseStatus,
+    { label: string; badge: string; bar: string }
+  > = {
+    [CourseStatus.NotStarted]: {
+      label: "Not started",
+      badge: "bg-slate-100 text-slate-600",
+      bar: "bg-slate-300",
+    },
+    [CourseStatus.InProgress]: {
+      label: "In progress",
+      badge: "bg-blue-100 text-blue-700",
+      bar: "bg-blue-500",
+    },
+    [CourseStatus.Completed]: {
+      label: "Completed",
+      badge: "bg-green-100 text-green-700",
+      bar: "bg-green-500",
+    },
+  };
+
+  const statusUI = statusConfig[safeStatus];
+
+  const buttonLabel =
+    safeStatus === CourseStatus.Completed
+      ? "Completed"
+      : safeStatus === CourseStatus.InProgress
+      ? "Resume"
+      : "Start Course";
 
   const handleDownload = async (e: React.MouseEvent) => {
     e.stopPropagation();
     await onDownload(course.id);
   };
 
+  // Debug safety net (optional)
+  if (!statusUI) {
+    console.warn("[CourseCard] Invalid status", {
+      receivedStatus: status,
+      normalized: safeStatus,
+      progress,
+      courseId: course.id,
+    });
+  }
+
+  // ----------------------------
+  // UI
+  // ----------------------------
   return (
     <div
-      className={`bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col transition-all hover:shadow-md ${isDisabled ? "opacity-50 grayscale" : ""}`}
+      className={`bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col transition-all hover:shadow-md ${
+        isDisabled ? "opacity-50 grayscale" : ""
+      }`}
     >
+      {/* Thumbnail */}
       <div className="relative h-40 overflow-hidden group">
         <img
           src={course.thumbnail}
           alt={course.title}
           className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
         />
+
         <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
           {!isDisabled && (
             <button
@@ -61,14 +153,25 @@ export const CourseCard: React.FC<CourseCardProps> = ({
         )}
       </div>
 
+      {/* Content */}
       <div className="p-4 flex-1 flex flex-col">
-        <div className="flex justify-between items-start mb-2">
+        <div className="flex justify-between items-start mb-2 gap-2">
           <h3 className="font-semibold text-slate-900 line-clamp-2 leading-tight">
             {course.title}
           </h3>
+
           {isCompleted && (
-            <CheckCircle size={18} className="text-green-500 shrink-0 ml-2" />
+            <CheckCircle size={18} className="text-green-500 shrink-0" />
           )}
+        </div>
+
+        {/* Status badge */}
+        <div className="mb-2">
+          <span
+            className={`text-xs px-2 py-1 rounded-full font-medium ${statusUI.badge}`}
+          >
+            {statusUI.label}
+          </span>
         </div>
 
         <p className="text-slate-500 text-sm mb-4 line-clamp-2 flex-1">
@@ -76,18 +179,18 @@ export const CourseCard: React.FC<CourseCardProps> = ({
         </p>
 
         <div className="mt-auto space-y-3">
-          {/* Progress Bar */}
           <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
             <div
-              className={`h-full rounded-full transition-all duration-500 ${isCompleted ? "bg-green-500" : "bg-blue-600"}`}
-              style={{ width: `${progress}%` }}
+              className={`h-2 rounded-full transition-all ${statusUI.bar}`}
+              style={{ width: `${normalizedProgress}%` }}
             />
           </div>
+
           <div className="flex justify-between text-xs text-slate-500">
-            <span>{progress}% Complete</span>
+            <span>{normalizedProgress}% Complete</span>
             {course.deadline && (
               <span>
-                Due: {new Date(course.deadline!).toLocaleDateString()}
+                Due: {new Date(course.deadline).toLocaleDateString()}
               </span>
             )}
           </div>
@@ -96,13 +199,13 @@ export const CourseCard: React.FC<CourseCardProps> = ({
             <button
               onClick={() => onStart(course.id)}
               disabled={isDisabled}
-              className={`text-sm font-medium ${isDisabled ? "cursor-not-allowed" : "text-blue-600 hover:text-blue-700"}`}
+              className={`text-sm font-medium ${
+                isDisabled
+                  ? "cursor-not-allowed text-slate-400"
+                  : "text-blue-600 hover:text-blue-700"
+              }`}
             >
-              {progress === 100
-                ? "Completed"
-                : progress > 0
-                  ? "Resume"
-                  : "Start Course"}
+              {buttonLabel}
             </button>
 
             <div className="flex items-center gap-2">
@@ -128,7 +231,7 @@ export const CourseCard: React.FC<CourseCardProps> = ({
                   onClick={handleDownload}
                   className="text-slate-400 hover:text-slate-600 transition-colors p-1"
                   title="Download for Offline"
-                  disabled={isOfflineMode} // Cannot download while offline
+                  disabled={isOfflineMode}
                 >
                   {isOfflineMode ? <Clock size={16} /> : <Download size={16} />}
                 </button>
