@@ -18,13 +18,13 @@ export const FieldAssessmentPage: React.FC<Props> = ({ userId }) => {
 
   // Create stable object URLs from images, with cleanup
   const imageUrls = useMemo(() => {
-    return images.map(img => URL.createObjectURL(img));
+    return images.map((img) => URL.createObjectURL(img));
   }, [images]);
 
   // Revoke object URLs when component unmounts or images change
   useEffect(() => {
     return () => {
-      imageUrls.forEach(url => URL.revokeObjectURL(url));
+      imageUrls.forEach((url) => URL.revokeObjectURL(url));
     };
   }, [imageUrls]);
 
@@ -101,18 +101,28 @@ export const FieldAssessmentPage: React.FC<Props> = ({ userId }) => {
       // Check response status
       if (!response.ok) {
         let errorMessage = "Failed to submit assessment";
+        // Read response body once as text
+        let body = "";
         try {
-          const errorData = await response.json();
-          errorMessage = errorData.message || errorMessage;
+          body = await response.text();
         } catch {
-          // If JSON parsing fails, try to get text
-          try {
-            const errorText = await response.text();
-            errorMessage = `Server error (${response.status}): ${errorText}`;
-          } catch {
-            errorMessage = `Server error (${response.status})`;
-          }
+          body = "";
         }
+
+        // Try to parse as JSON to extract message
+        if (body) {
+          try {
+            const errorData = JSON.parse(body);
+            errorMessage =
+              errorData.message || `Server error (${response.status}): ${body}`;
+          } catch {
+            // If not valid JSON, use raw body text
+            errorMessage = `Server error (${response.status}): ${body}`;
+          }
+        } else {
+          errorMessage = `Server error (${response.status})`;
+        }
+
         setError(errorMessage);
         console.error("Assessment submission failed", {
           status: response.status,
@@ -150,7 +160,7 @@ export const FieldAssessmentPage: React.FC<Props> = ({ userId }) => {
           Upload up to 4 photos or one video as proof of field activity.
         </p>
 
-        <input 
+        <input
           type="text"
           placeholder="Module Topic"
           value={moduleTopic}
@@ -226,6 +236,7 @@ export const FieldAssessmentPage: React.FC<Props> = ({ userId }) => {
             >
               <X size={16} />
             </button>
+            {error && <p className="text-red-600 text-sm">{error}</p>}
           </div>
         )}
 

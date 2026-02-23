@@ -29,27 +29,20 @@ const authFetch = async (url: string, options: RequestInit = {}) => {
     headers
   })
 
-  let data;
+  // Read response body once as text, then parse individually
+  let text: string;
   try {
-    data = await res.json();
-  } catch (parseError) {
-    // If JSON parsing fails, try to get text for better error reporting
-    const text = await res.text().catch(() => "<unable to read response body>");
-    if (process.env.NODE_ENV !== "production") {
-      console.log("[API RESPONSE]", {
-        url,
-        status: res.status,
-        ok: res.ok,
-        parseError,
-        responseText: text
-      });
-    }
-    if (!res.ok) {
-      console.error("API Error:", {url, status: res.status, text});
-      throw new Error(`API request failed: ${res.status} ${text}`);
-    }
-    // Success status but unparseable JSON is unexpected
-    throw new Error(`Unexpected non-JSON success response from ${url} (${res.status}): ${text}`);
+    text = await res.text();
+  } catch {
+    text = "<unable to read response body>";
+  }
+
+  let data = null;
+  let parseError: Error | null = null;
+  try {
+    data = text ? JSON.parse(text) : null;
+  } catch (err) {
+    parseError = err instanceof Error ? err : new Error(String(err));
   }
 
   if (process.env.NODE_ENV !== "production") {
@@ -57,17 +50,19 @@ const authFetch = async (url: string, options: RequestInit = {}) => {
       url,
       status: res.status,
       ok: res.ok,
-      data
+      parseError: parseError ? parseError.message : null,
+      responseText: text
     });
   }
 
   if (!res.ok) {
-    console.error("API Error:", {url, status: res.status, data});
-    throw new Error(data?.message || "API request failed");
+    console.error("API Error:", {url, status: res.status, text});
+    throw new Error(`API request failed: ${res.status} ${text}`);
   }
 
-  if (data === null) {
-    throw new Error(`Unexpected null data from successful API response: ${url} (${res.status})`);
+  if (parseError) {
+    // Success status but unparseable JSON is unexpected
+    throw new Error(`Unexpected non-JSON success response from ${url} (${res.status}): ${text}`);
   }
 
   return data;

@@ -108,7 +108,6 @@ export const CourseCard: React.FC<CourseCardProps> = ({
     console.warn("[CourseCard] Invalid status, using fallback", {
       receivedStatus: status,
       normalized: safeStatus,
-      normalizeStatus,
       progress,
       courseId: course.id,
     });

@@ -59,6 +59,13 @@ export const ScormPlayer: React.FC<ScormPlayerProps> = ({
   // ----------------------------
   // Helpers
   // ----------------------------
+  useEffect(() => {
+    return () => {
+      if (syncTimeoutRef.current) {
+        clearTimeout(syncTimeoutRef.current);
+      }
+    };
+  }, []);
   const scheduleCloudSync = (attemptId: string) => {
     if (syncTimeoutRef.current) {
       clearTimeout(syncTimeoutRef.current);
