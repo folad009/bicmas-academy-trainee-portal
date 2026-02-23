@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { getAccessToken } from "../utils/auth";
 import { X } from "lucide-react";
 
@@ -14,6 +14,19 @@ export const FieldAssessmentPage: React.FC<Props> = ({ userId }) => {
   const [note, setNote] = useState("");
   const [moduleTopic, setModuleTopic] = useState("");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Create stable object URLs from images, with cleanup
+  const imageUrls = useMemo(() => {
+    return images.map(img => URL.createObjectURL(img));
+  }, [images]);
+
+  // Revoke object URLs when component unmounts or images change
+  useEffect(() => {
+    return () => {
+      imageUrls.forEach(url => URL.revokeObjectURL(url));
+    };
+  }, [imageUrls]);
 
   // ----------------------------
   // Image handling (max 4, additive)
@@ -74,9 +87,10 @@ export const FieldAssessmentPage: React.FC<Props> = ({ userId }) => {
     }
 
     setLoading(true);
+    setError(null);
 
     try {
-      await fetch("/api/field-assessments", {
+      const response = await fetch("/api/field-assessments", {
         method: "POST",
         headers: {
           Authorization: `Bearer ${getAccessToken()}`,
@@ -84,14 +98,42 @@ export const FieldAssessmentPage: React.FC<Props> = ({ userId }) => {
         body: formData,
       });
 
+      // Check response status
+      if (!response.ok) {
+        let errorMessage = "Failed to submit assessment";
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.message || errorMessage;
+        } catch {
+          // If JSON parsing fails, try to get text
+          try {
+            const errorText = await response.text();
+            errorMessage = `Server error (${response.status}): ${errorText}`;
+          } catch {
+            errorMessage = `Server error (${response.status})`;
+          }
+        }
+        setError(errorMessage);
+        console.error("Assessment submission failed", {
+          status: response.status,
+          error: errorMessage,
+        });
+        alert(errorMessage);
+        return;
+      }
+
       // Reset after success
       setImages([]);
       setVideo(null);
       setModuleTopic("");
       setNote("");
+      setError(null);
+      alert("Assessment submitted successfully!");
     } catch (e) {
-      console.error(e);
-      alert("Failed to submit assessment");
+      const message = e instanceof Error ? e.message : "Unknown error";
+      setError(message);
+      console.error("Assessment submission error", e);
+      alert(message);
     } finally {
       setLoading(false);
     }
@@ -156,7 +198,7 @@ export const FieldAssessmentPage: React.FC<Props> = ({ userId }) => {
             {images.map((img, i) => (
               <div key={i} className="relative">
                 <img
-                  src={URL.createObjectURL(img)}
+                  src={imageUrls[i]}
                   className="w-24 h-24 object-cover rounded-lg border"
                 />
                 <button

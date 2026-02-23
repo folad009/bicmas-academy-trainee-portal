@@ -178,7 +178,7 @@ export const Layout: React.FC<LayoutProps> = ({
       <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 flex justify-around p-2 z-40 pb-safe">
         <NavItem id="dashboard" icon={LayoutDashboard} label="Home" />
         <NavItem id="library" icon={BookOpen} label="Courses" />
-        <NavItem id="assessment" icon={Camera} label="Field Assessment" />
+        <NavItem id="assessment" icon={Camera} label="Field Task" />
         <NavItem id="community" icon={MessageCircle} label="Forum" />
         <NavItem id="certificates" icon={Award} label="Awards" />
         <NavItem id="profile" icon={UserCircle} label="Profile" />

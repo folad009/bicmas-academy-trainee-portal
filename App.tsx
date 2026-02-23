@@ -157,8 +157,6 @@ export default function App() {
     removeDownloaded(courseId);
   };
 
-  console.log("DASHBOARD COURSES", dashboardCourses);
-  
   // ---------------- Views ----------------
   const renderLibrary = () => (
     <div className="space-y-6">

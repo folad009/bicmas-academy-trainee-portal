@@ -94,7 +94,25 @@ export const CourseCard: React.FC<CourseCardProps> = ({
     },
   };
 
-  const statusUI = statusConfig[safeStatus];
+  // Default fallback UI in case statusUI is undefined
+  const defaultStatusUI = {
+    label: "Unknown",
+    badge: "bg-gray-100 text-gray-600",
+    bar: "bg-gray-300",
+  };
+
+  const statusUI = statusConfig[safeStatus] || defaultStatusUI;
+
+  // Debug safety net (optional) - log if fallback is used
+  if (!statusConfig[safeStatus]) {
+    console.warn("[CourseCard] Invalid status, using fallback", {
+      receivedStatus: status,
+      normalized: safeStatus,
+      normalizeStatus,
+      progress,
+      courseId: course.id,
+    });
+  }
 
   const buttonLabel =
     safeStatus === CourseStatus.Completed
@@ -107,16 +125,6 @@ export const CourseCard: React.FC<CourseCardProps> = ({
     e.stopPropagation();
     await onDownload(course.id);
   };
-
-  // Debug safety net (optional)
-  if (!statusUI) {
-    console.warn("[CourseCard] Invalid status", {
-      receivedStatus: status,
-      normalized: safeStatus,
-      progress,
-      courseId: course.id,
-    });
-  }
 
   // ----------------------------
   // UI

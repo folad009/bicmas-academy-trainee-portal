@@ -16,13 +16,12 @@ interface SyncAttemptPayload {
 const authFetch = async (url: string, options: RequestInit = {}) => {
   const token = getAccessToken();
 
-  const headers: Record<string, string> = {
-    Authorization: `Bearer ${token}`,
-    ...(options.headers as Record<string, string>)
-  }
+  // Properly merge headers without unsafe casting
+  const headers = new Headers(options.headers);
+  headers.set('Authorization', `Bearer ${token}`);
 
   if(!(options.body instanceof FormData)) {
-    headers["Content-Type"] = "application/json";
+    headers.set("Content-Type", "application/json");
   }
 
   const res = await fetch(url, {
@@ -30,18 +29,45 @@ const authFetch = async (url: string, options: RequestInit = {}) => {
     headers
   })
 
-  const data = await res.json().catch(() => null);
+  let data;
+  try {
+    data = await res.json();
+  } catch (parseError) {
+    // If JSON parsing fails, try to get text for better error reporting
+    const text = await res.text().catch(() => "<unable to read response body>");
+    if (process.env.NODE_ENV !== "production") {
+      console.log("[API RESPONSE]", {
+        url,
+        status: res.status,
+        ok: res.ok,
+        parseError,
+        responseText: text
+      });
+    }
+    if (!res.ok) {
+      console.error("API Error:", {url, status: res.status, text});
+      throw new Error(`API request failed: ${res.status} ${text}`);
+    }
+    // Success status but unparseable JSON is unexpected
+    throw new Error(`Unexpected non-JSON success response from ${url} (${res.status}): ${text}`);
+  }
 
-  console.log("[API RESPONSE]", {
-    url,
-    status: res.status,
-    ok: res.ok,
-    data
-  });
-  
+  if (process.env.NODE_ENV !== "production") {
+    console.log("[API RESPONSE]", {
+      url,
+      status: res.status,
+      ok: res.ok,
+      data
+    });
+  }
+
   if (!res.ok) {
     console.error("API Error:", {url, status: res.status, data});
     throw new Error(data?.message || "API request failed");
+  }
+
+  if (data === null) {
+    throw new Error(`Unexpected null data from successful API response: ${url} (${res.status})`);
   }
 
   return data;
@@ -93,9 +119,16 @@ export const syncCourseAttempt = async (attemptId: string) => {
     throw new Error("No attempt data returned from sync");
   }
 
+  // Validate that attemptId is present before constructing normalized object
+  const computedAttemptId = res.data.attemptId || res.data.attempt?.id;
+  if (!computedAttemptId) {
+    console.error("[SCORM SYNC] Missing attemptId in response", {data: res.data});
+    throw new Error("Missing attemptId in sync response - cannot proceed");
+  }
+
   const normalized = {
     // Backend authoritative identity
-    attemptId: res.data.attemptId || res.data.attempt?.id,
+    attemptId: computedAttemptId,
 
     // Use top-level package id (not nested attempt one)
     scormPackageId: res.data.scormPackageId,
@@ -103,6 +136,6 @@ export const syncCourseAttempt = async (attemptId: string) => {
     completionPercentage: res.data.completionPercentage ?? 0,
     status: res.data.status as AttemptStatus,
   };
-  
+
   return normalized;
 };

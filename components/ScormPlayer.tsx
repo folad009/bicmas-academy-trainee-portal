@@ -77,30 +77,30 @@ export const ScormPlayer: React.FC<ScormPlayerProps> = ({
   };
 
   const handleSessionEnded = async () => {
-  try {
-    if (scormAttemptIdRef.current) {
-      const updated = await syncAttempt(scormAttemptIdRef.current, course.id);
-      console.log("[PLAYER] Sync returned", updated);
-       
-      if (
-        updated?.attemptId &&
-        updated.attemptId !== scormAttemptIdRef.current
-      ) {
-        console.log("[SCORM] AttemptId updated (final)", {
-          old: scormAttemptIdRef.current,
-          new: updated.attemptId,
-        });
+    try {
+      if (scormAttemptIdRef.current) {
+        const updated = await syncAttempt(scormAttemptIdRef.current, course.id);
+        console.log("[PLAYER] Sync returned", updated);
 
-        scormAttemptIdRef.current = updated.attemptId;
-        setScormAttemptId(updated.attemptId);
+        if (
+          updated?.attemptId &&
+          updated.attemptId !== scormAttemptIdRef.current
+        ) {
+          console.log("[SCORM] AttemptId updated (final)", {
+            old: scormAttemptIdRef.current,
+            new: updated.attemptId,
+          });
+
+          scormAttemptIdRef.current = updated.attemptId;
+          setScormAttemptId(updated.attemptId);
+        }
       }
+    } catch (e) {
+      console.error("Final sync failed", e);
     }
-  } catch (e) {
-    console.error("Final sync failed", e);
-  }
 
-  triggerCompletion();
-};
+    triggerCompletion();
+  };
   // ----------------------------
   // Load SCORM launch URL
   // ----------------------------
