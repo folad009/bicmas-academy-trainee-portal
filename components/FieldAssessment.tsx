@@ -44,6 +44,21 @@ export const FieldAssessmentPage: React.FC<Props> = ({ userId }) => {
     const videos = files.filter((f) => f.type.startsWith("video/"));
     const images = files.filter((f) => f.type.startsWith("image/"));
 
+    // Prevent conflicting media selections
+    // If videos are being selected but images already exist, prevent video selection
+    if (videos.length > 0 && mediaType === "image" && mediaFiles.length > 0) {
+      console.warn("Cannot add videos while images are already selected. Please remove existing images first.");
+      e.target.value = "";
+      return;
+    }
+
+    // If images are being selected but a video already exists, prevent image selection
+    if (images.length > 0 && mediaType === "video" && mediaFiles.length > 0) {
+      console.warn("Cannot add images while a video is already selected. Please remove the video first.");
+      e.target.value = "";
+      return;
+    }
+
     // Determine type and set media
     if (videos.length > 0) {
       // Only one video allowed
