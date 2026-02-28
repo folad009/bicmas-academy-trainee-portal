@@ -40,21 +40,23 @@ export const FieldAssessmentPage: React.FC<Props> = ({ userId }) => {
 
     if (files.length === 0) return;
 
-    const firstFile = files[0];
-    const isVideo = firstFile.type.startsWith("video/");
-    const isImage = firstFile.type.startsWith("image/");
+    // Filter files by MIME type
+    const videos = files.filter((f) => f.type.startsWith("video/"));
+    const images = files.filter((f) => f.type.startsWith("image/"));
 
-    // Determine type
-    if (isVideo) {
+    // Determine type and set media
+    if (videos.length > 0) {
+      // Only one video allowed
       setMediaType("video");
-      setMediaFiles([firstFile]); // only one video allowed
-    } else if (isImage) {
+      setMediaFiles([videos[0]]);
+    } else if (images.length > 0) {
       setMediaType("image");
       setMediaFiles((prev) => {
-        const combined = [...prev, ...files];
+        const combined = [...prev, ...images];
         return combined.slice(0, MAX_IMAGES);
       });
     }
+    // Non-image/non-video files are ignored
 
     e.target.value = "";
   };
@@ -207,6 +209,7 @@ export const FieldAssessmentPage: React.FC<Props> = ({ userId }) => {
               <div key={i} className="relative">
                 <img
                   src={url}
+                  alt={`Assessment image ${i + 1}`}
                   className="w-24 h-24 object-cover rounded-lg border"
                 />
                 <button

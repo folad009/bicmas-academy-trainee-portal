@@ -1,7 +1,11 @@
 import { getAccessToken } from "@/utils/auth";
 
 const BASE_URL =
-  "https://bicmas-academy-main-backend-production.up.railway.app";
+  typeof window !== "undefined" && typeof process !== "undefined"
+    ? process.env.NEXT_PUBLIC_API_BASE_URL ||
+      "https://bicmas-academy-main-backend-production.up.railway.app"
+    : process?.env?.NEXT_PUBLIC_API_BASE_URL ||
+      "https://bicmas-academy-main-backend-production.up.railway.app";
 
 export async function fieldTask(
   moduleTitle: string,

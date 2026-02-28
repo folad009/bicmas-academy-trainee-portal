@@ -47,10 +47,18 @@ export function usePWAInstall() {
     const promptEvent = deferredPromptRef.current;
     if (!promptEvent) return;
 
-    await promptEvent.prompt();
-    const result = await promptEvent.userChoice;
-
-    if (result.outcome === "accepted") {
+    try {
+      await promptEvent.prompt();
+      const result = await promptEvent.userChoice;
+      // Result is handled but we clear the event regardless
+      if (result.outcome === "accepted") {
+        // Installation accepted - event is already consumed
+      }
+    } catch (error) {
+      // Handle error if prompt throws
+      console.error("PWA install prompt failed:", error);
+    } finally {
+      // Always clear the stale event immediately after prompt() to prevent reuse
       deferredPromptRef.current = null;
       setIsInstallable(false);
     }

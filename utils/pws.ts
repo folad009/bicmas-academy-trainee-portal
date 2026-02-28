@@ -1,12 +1,32 @@
 
 
 export function isIOS() {
-    return /iphone|ipad|ipod/i.test(window.navigator.userAgent)
+    // Guard against SSR environments
+    if (typeof window === "undefined" || typeof window.navigator === "undefined") {
+        return false;
+    }
+    
+    const ua = window.navigator.userAgent;
+    const isIOSUA = /iphone|ipad|ipod/i.test(ua);
+    
+    // Handle iPadOS 13+ which spoofs macOS
+    const isIPadOS13Plus = window.navigator.platform === "MacIntel" && window.navigator.maxTouchPoints > 1;
+    
+    return isIOSUA || isIPadOS13Plus;
 }
 
 export function isStandalone() {
-    return (
-        window.matchMedia("(display-mode: standalone)").matches ||
-        (window.navigator as any).standalone === true
-    )
+    // Guard against SSR environments
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
+        return false;
+    }
+    
+    try {
+        return (
+            window.matchMedia("(display-mode: standalone)").matches ||
+            (window.navigator as any)?.standalone === true
+        );
+    } catch (error) {
+        return false;
+    }
 }

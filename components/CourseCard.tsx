@@ -142,8 +142,13 @@ export const CourseCard: React.FC<CourseCardProps> = ({
           }
           alt={course.title}
           onError={(e) => {
-            (e.currentTarget as HTMLImageElement).src =
-              `https://picsum.photos/seed/${course.id}/600/400`;
+            const img = e.currentTarget as HTMLImageElement;
+            const fallbackUrl = `https://picsum.photos/seed/${course.id}/600/400`;
+            // Only set fallback if not already applied
+            if (img.src !== fallbackUrl && !img.dataset.fallbackApplied) {
+              img.src = fallbackUrl;
+              img.dataset.fallbackApplied = "true";
+            }
           }}
           className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
         />
