@@ -29,10 +29,7 @@ interface CourseCardProps {
  * - enum value
  * ---------------------------------------
  */
-const normalizeStatus = (
-  rawStatus: any,
-  progress: number
-): CourseStatus => {
+const normalizeStatus = (rawStatus: any, progress: number): CourseStatus => {
   // Progress is the strongest signal
   if (progress >= 100) return CourseStatus.Completed;
   if (progress > 0) return CourseStatus.InProgress;
@@ -62,7 +59,7 @@ export const CourseCard: React.FC<CourseCardProps> = ({
   // Safe derived values
   // ----------------------------
   const normalizedProgress = Math.round(
-    Math.min(100, Math.max(0, progress || 0))
+    Math.min(100, Math.max(0, progress || 0)),
   );
 
   const safeStatus = normalizeStatus(status, normalizedProgress);
@@ -117,13 +114,15 @@ export const CourseCard: React.FC<CourseCardProps> = ({
     safeStatus === CourseStatus.Completed
       ? "Completed"
       : safeStatus === CourseStatus.InProgress
-      ? "Resume"
-      : "Start Course";
+        ? "Resume"
+        : "Start Course";
 
   const handleDownload = async (e: React.MouseEvent) => {
     e.stopPropagation();
     await onDownload(course.id);
   };
+
+   // console.log("Course image:", course.thumbnail, course);
 
   // ----------------------------
   // UI
@@ -137,8 +136,15 @@ export const CourseCard: React.FC<CourseCardProps> = ({
       {/* Thumbnail */}
       <div className="relative h-40 overflow-hidden group">
         <img
-          src={course.thumbnail}
+          src={
+            course.thumbnail ||
+            `https://picsum.photos/seed/${course.id}/600/400`
+          }
           alt={course.title}
+          onError={(e) => {
+            (e.currentTarget as HTMLImageElement).src =
+              `https://picsum.photos/seed/${course.id}/600/400`;
+          }}
           className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
         />
 
@@ -196,9 +202,7 @@ export const CourseCard: React.FC<CourseCardProps> = ({
           <div className="flex justify-between text-xs text-slate-500">
             <span>{normalizedProgress}% Complete</span>
             {course.deadline && (
-              <span>
-                Due: {new Date(course.deadline).toLocaleDateString()}
-              </span>
+              <span>Due: {new Date(course.deadline).toLocaleDateString()}</span>
             )}
           </div>
 

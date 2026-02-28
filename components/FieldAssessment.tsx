@@ -6,71 +6,80 @@ type Props = {
   userId: string;
 };
 
+type MediaType = "image" | "video" | null;
+
 const MAX_IMAGES = 4;
 
 export const FieldAssessmentPage: React.FC<Props> = ({ userId }) => {
-  const [images, setImages] = useState<File[]>([]);
-  const [video, setVideo] = useState<File | null>(null);
+  const [mediaType, setMediaType] = useState<MediaType>(null);
+  const [mediaFiles, setMediaFiles] = useState<File[]>([]);
   const [note, setNote] = useState("");
   const [moduleTopic, setModuleTopic] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Create stable object URLs from images, with cleanup
-  const imageUrls = useMemo(() => {
-    return images.map((img) => URL.createObjectURL(img));
-  }, [images]);
+  const mediaUrls = useMemo(() => {
+    return mediaFiles.map((file) => URL.createObjectURL(file));
+  }, [mediaFiles]);
 
   // Revoke object URLs when component unmounts or images change
   useEffect(() => {
     return () => {
-      imageUrls.forEach((url) => URL.revokeObjectURL(url));
+      mediaUrls.forEach((url) => URL.revokeObjectURL(url));
     };
-  }, [imageUrls]);
+  }, [mediaUrls]);
 
   // ----------------------------
-  // Image handling (max 4, additive)
+  // Media handling (max 4, or 1 video)
   // ----------------------------
-  const handleImages = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleMedia = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return;
 
-    const selected = Array.from(e.target.files);
+    const files: File[] = Array.from(e.target.files);
 
-    // Cannot mix with video
-    setVideo(null);
+    if (files.length === 0) return;
 
-    setImages((prev) => {
-      const combined = [...prev, ...selected];
-      return combined.slice(0, MAX_IMAGES);
-    });
+    const firstFile = files[0];
+    const isVideo = firstFile.type.startsWith("video/");
+    const isImage = firstFile.type.startsWith("image/");
+
+    // Determine type
+    if (isVideo) {
+      setMediaType("video");
+      setMediaFiles([firstFile]); // only one video allowed
+    } else if (isImage) {
+      setMediaType("image");
+      setMediaFiles((prev) => {
+        const combined = [...prev, ...files];
+        return combined.slice(0, MAX_IMAGES);
+      });
+    }
 
     e.target.value = "";
   };
 
-  const removeImage = (index: number) => {
-    setImages((prev) => prev.filter((_, i) => i !== index));
-  };
+  const removeMedia = (index?: number) => {
+    if (mediaType === "video") {
+      setMediaFiles([]);
+      setMediaType(null);
+      return;
+    }
 
-  // ----------------------------
-  // Video handling
-  // ----------------------------
-  const handleVideo = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files?.[0]) return;
-
-    setVideo(e.target.files[0]);
-    setImages([]); // cannot mix
-    e.target.value = "";
-  };
-
-  const removeVideo = () => {
-    setVideo(null);
+    if (mediaType === "image" && index !== undefined) {
+      setMediaFiles((prev) => {
+        const updated = prev.filter((_, i) => i !== index);
+        if (updated.length === 0) setMediaType(null);
+        return updated;
+      });
+    }
   };
 
   // ----------------------------
   // Submit
   // ----------------------------
   const handleSubmit = async () => {
-    if (!video && images.length === 0) {
+    if (mediaFiles.length === 0) {
       alert("Upload up to 4 images or one video.");
       return;
     }
@@ -80,17 +89,17 @@ export const FieldAssessmentPage: React.FC<Props> = ({ userId }) => {
     formData.append("moduleTopic", moduleTopic);
     formData.append("note", note);
 
-    if (video) {
-      formData.append("video", video);
+    if (mediaType === "video") {
+      formData.append("video", mediaFiles[0]);
     } else {
-      images.forEach((img) => formData.append("images", img));
+      mediaFiles.forEach((file) => formData.append("images", file));
     }
 
     setLoading(true);
     setError(null);
 
     try {
-      const response = await fetch("/api/field-assessments", {
+      const response = await fetch("/api/fieldTask", {
         method: "POST",
         headers: {
           Authorization: `Bearer ${getAccessToken()}`,
@@ -133,8 +142,8 @@ export const FieldAssessmentPage: React.FC<Props> = ({ userId }) => {
       }
 
       // Reset after success
-      setImages([]);
-      setVideo(null);
+      setMediaFiles([]);
+      setMediaType(null);
       setModuleTopic("");
       setNote("");
       setError(null);
@@ -178,41 +187,30 @@ export const FieldAssessmentPage: React.FC<Props> = ({ userId }) => {
         {/* Image upload */}
         <div>
           <label className="block text-sm font-medium mb-1">
-            Upload Images ({images.length}/{MAX_IMAGES})
+            Upload Media (Max 4 images or 1 video)
           </label>
           <input
             type="file"
-            accept="image/*"
-            multiple
-            disabled={video !== null || images.length >= MAX_IMAGES}
-            onChange={handleImages}
+            accept="image/*,video/*"
+            multiple={mediaType !== "video"}
+            disabled={
+              mediaType === "video" ||
+              (mediaType === "image" && mediaFiles.length >= MAX_IMAGES)
+            }
+            onChange={handleMedia}
           />
         </div>
 
-        {/* Video upload */}
-        <div>
-          <label className="block text-sm font-medium mb-1">
-            Or Upload Video
-          </label>
-          <input
-            type="file"
-            accept="video/*"
-            disabled={images.length > 0 || video !== null}
-            onChange={handleVideo}
-          />
-        </div>
-
-        {/* Image previews */}
-        {images.length > 0 && (
+        {mediaType === "image" && mediaFiles.length > 0 && (
           <div className="flex gap-3 flex-wrap">
-            {images.map((img, i) => (
+            {mediaUrls.map((url, i) => (
               <div key={i} className="relative">
                 <img
-                  src={imageUrls[i]}
+                  src={url}
                   className="w-24 h-24 object-cover rounded-lg border"
                 />
                 <button
-                  onClick={() => removeImage(i)}
+                  onClick={() => removeMedia(i)}
                   className="absolute -top-2 -right-2 bg-black text-white rounded-full p-1"
                 >
                   <X size={14} />
@@ -222,21 +220,19 @@ export const FieldAssessmentPage: React.FC<Props> = ({ userId }) => {
           </div>
         )}
 
-        {/* Video preview */}
-        {video && (
+        {mediaType === "video" && mediaFiles[0] && (
           <div className="relative">
             <video
-              src={URL.createObjectURL(video)}
+              src={mediaUrls[0]}
               controls
               className="w-full max-h-64 rounded-lg border"
             />
             <button
-              onClick={removeVideo}
+              onClick={() => removeMedia()}
               className="absolute top-2 right-2 bg-black text-white rounded-full p-1"
             >
               <X size={16} />
             </button>
-            {error && <p className="text-red-600 text-sm">{error}</p>}
           </div>
         )}
 

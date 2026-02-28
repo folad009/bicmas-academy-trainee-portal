@@ -32,7 +32,7 @@ export function mapAssignedCourse(assignment: any): Course {
 
     title: course.title,
     description: course.description ?? "",
-    thumbnail: "/course-placeholder.png",
+    thumbnail: course.imageUrl ?? null,
 
     category: "Mandatory",
     status: deriveStatus(progress),

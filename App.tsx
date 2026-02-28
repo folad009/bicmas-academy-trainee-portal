@@ -21,6 +21,8 @@ import { useLibrary } from "@/hooks/useLibrary";
 import { useOfflineStatus } from "@/hooks/useOfflineStatus";
 import { useProgressUpdate } from "@/hooks/useProgressUpdate";
 import { FieldAssessmentPage } from "./components/FieldAssessment";
+import { PWAInstallBanner } from "./components/PWAInstallBanner";
+import { PWAIOSBanner } from "./components/PWAIOSBanner";
 
 type LibraryFilter = "ALL" | "MANDATORY" | "RECOMMENDED" | "COMPLETED";
 
@@ -294,6 +296,14 @@ export default function App() {
         {activeView === "community" && <Community user={user} />}
         {activeView === "profile" && renderProfile()}
       </Layout>
+
+      {!activeCourse && (
+        <>
+          {" "}
+          <PWAInstallBanner />
+          <PWAIOSBanner />
+        </>
+      )}
 
       <CertificateModal
         isOpen={!!selectedCertificate}
