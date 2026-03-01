@@ -245,7 +245,7 @@ export default function App() {
       );
     }
 
-    if (!learningPaths.length) {
+    if (!learningPaths?.length) {
       return (
         <div className="p-10 text-center text-slate-400">
           No learning paths available.
@@ -256,9 +256,10 @@ export default function App() {
     return (
       <div className="space-y-8">
         {learningPaths.map((path) => {
-          const pathCourses = libraryCourses.filter((course) =>
-            path.curriculumSequence.includes(course.id),
-          );
+          const courseById = new Map(libraryCourses.map((c) => [c.id, c]));
+          const pathCourses = path.curriculumSequence
+            .map((id) => courseById.get(id))
+            .filter((c): c is Course => !!c);
 
           return (
             <div key={path.id} className="space-y-4">
