@@ -23,6 +23,8 @@ import { useProgressUpdate } from "@/hooks/useProgressUpdate";
 import { FieldAssessmentPage } from "./components/FieldAssessment";
 import { PWAInstallBanner } from "./components/PWAInstallBanner";
 import { PWAIOSBanner } from "./components/PWAIOSBanner";
+import { useLearningPaths } from "@/hooks/useLearningPaths";
+import { mapLearningPath } from "@/mappers/learningPathMapper";
 
 type LibraryFilter = "ALL" | "MANDATORY" | "RECOMMENDED" | "COMPLETED";
 
@@ -72,6 +74,7 @@ export default function App() {
   const stats = dashboardData?.stats ?? DEFAULT_STATS;
 
   const { data: libraryCoursesRaw = [] } = useLibrary(dashboardCourses);
+  const { data: learningPaths, isLoading: isPathsLoading } = useLearningPaths();
 
   // ---------------- Derived Data ----------------
   const libraryCourses = useMemo(() => {
@@ -82,6 +85,14 @@ export default function App() {
       isDownloaded: downloadedIds.includes(course.id),
     }));
   }, [libraryCoursesRaw]);
+
+  const currentLearningPath = useMemo(() => {
+    if (!learningPaths || learningPaths.length === 0) return null;
+
+    const backendPath = learningPaths[0];
+
+    return mapLearningPath(backendPath, libraryCourses);
+  }, [learningPaths, libraryCourses]);
 
   const filteredCourses = useMemo(() => {
     return libraryCourses.filter((course) => {
@@ -225,6 +236,64 @@ export default function App() {
     </div>
   );
 
+  const renderLearningPaths = () => {
+    if (isPathsLoading) {
+      return (
+        <div className="p-10 text-center text-slate-500">
+          Loading learning paths…
+        </div>
+      );
+    }
+
+    if (!learningPaths.length) {
+      return (
+        <div className="p-10 text-center text-slate-400">
+          No learning paths available.
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-8">
+        {learningPaths.map((path) => {
+          const pathCourses = libraryCourses.filter((course) =>
+            path.curriculumSequence.includes(course.id),
+          );
+
+          return (
+            <div key={path.id} className="space-y-4">
+              <div>
+                <h2 className="text-xl font-bold">{path.title}</h2>
+                <p className="text-slate-500 text-sm">{path.description}</p>
+              </div>
+
+              {pathCourses.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {pathCourses.map((course) => (
+                    <CourseCard
+                      key={course.id}
+                      course={course}
+                      progress={course.progress}
+                      status={course.status}
+                      onStart={handleStartCourse}
+                      onDownload={handleDownload}
+                      onRemoveDownload={handleRemoveDownload}
+                      isOfflineMode={isOffline}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="text-slate-400 text-sm">
+                  No courses found for this path.
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
   const renderProfile = () => (
     <div className="max-w-2xl mx-auto space-y-6">
       <div className="bg-white rounded-2xl p-8 border text-center">
@@ -281,6 +350,7 @@ export default function App() {
             <Dashboard
               courses={dashboardCourses}
               stats={stats}
+              learningPath={currentLearningPath}
               onStartCourse={handleStartCourse}
               onDownload={handleDownload}
               onRemoveDownload={handleRemoveDownload}
@@ -288,6 +358,8 @@ export default function App() {
               user={user}
             />
           ))}
+
+        {activeView === "learning-paths" && renderLearningPaths()}
 
         {activeView === "library" && renderLibrary()}
         {activeView === "assessment" && (

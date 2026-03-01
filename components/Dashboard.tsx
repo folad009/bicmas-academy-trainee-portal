@@ -30,7 +30,7 @@ import {
 
 interface DashboardProps {
   courses: Course[];
-  learningPath: LearningPath;
+  learningPath?: LearningPath | null;
   stats: UserStats;
   onStartCourse: (id: string) => void;
   onDownload: (id: string) => void;
@@ -168,7 +168,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             {/* Vertical Line */}
             <div className="absolute left-[19px] top-4 bottom-4 w-0.5 bg-slate-100 z-0"></div>
 
-            {path.steps.map((step, idx) => {
+            {path.steps?.map((step, idx) => {
               const isCurrent = step.status === "in-progress";
               const isCompleted = step.status === "completed";
               const isLocked = step.status === "locked";
@@ -386,6 +386,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 Recommended
               </span>
             </div>
+            
             <h4 className="font-bold text-lg mb-2">
               {currentCourse?.title || "You're all caught up"}
             </h4>
