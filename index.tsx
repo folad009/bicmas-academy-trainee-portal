@@ -3,8 +3,7 @@ import ReactDOM from "react-dom/client";
 import App from "./App";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "./state/queryClient";
-import { PWAInstallBanner } from "./components/PWAInstallBanner";
-import { PWAIOSBanner } from "./components/PWAIOSBanner";
+
 
 const rootElement = document.getElementById("root");
 if (!rootElement) {

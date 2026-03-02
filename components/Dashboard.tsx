@@ -12,7 +12,6 @@ import {
   Clock,
   BookOpen,
   Award,
-  Flame,
   TrendingUp,
   TrendingDown,
   Map,

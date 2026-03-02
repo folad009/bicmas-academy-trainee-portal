@@ -6,6 +6,10 @@ const BASE_URL =
 export async function fetchAssignedCourses() {
   const token = getAccessToken();
 
+  if (!token) {
+    throw new Error("No access token");
+  }
+
   const res = await fetch(
     `${BASE_URL}/api/v1/assignments/assigned-courses`,
     {
@@ -14,6 +18,10 @@ export async function fetchAssignedCourses() {
       },
     }
   );
+
+  if (res.status === 401) {
+    throw new Error("Unauthorized");
+  }
 
   if (!res.ok) {
     throw new Error("Failed to fetch assigned courses");
