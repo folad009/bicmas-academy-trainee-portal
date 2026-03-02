@@ -20,7 +20,8 @@ export async function fetchAssignedCourses() {
   );
 
   if (res.status === 401) {
-    throw new Error("Unauthorized");
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.message || "Unauthorized");
   }
 
   if (!res.ok) {
