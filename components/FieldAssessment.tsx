@@ -34,28 +34,29 @@ export const FieldAssessmentPage: React.FC<Props> = ({ userId }) => {
   /* ---------------------------
      Handle media selection
   ----------------------------*/
-  const handleMedia = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.currentTarget.files;
+ const handleMedia = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const fileList = e.currentTarget.files;
+  if (!fileList) return;
 
-    if (!files) return;
+  const files = Array.from(fileList) as File[];
 
-    const video = files.find((f) => f.type.startsWith("video/"));
-    const images = files.filter((f) => f.type.startsWith("image/"));
+  const video = files.find((f) => f.type.startsWith("video/"));
+  const images = files.filter((f) => f.type.startsWith("image/"));
 
-    if (video) {
-      setMediaType("video");
-      setMediaFiles([video]);
-      e.target.value = "";
-      return;
-    }
+  if (video) {
+    setMediaType("video");
+    setMediaFiles([video]);
+    e.currentTarget.value = "";
+    return;
+  }
 
-    if (images.length > 0) {
-      setMediaType("image");
-      setMediaFiles((prev) => [...prev, ...images].slice(0, MAX_IMAGES));
-    }
+  if (images.length > 0) {
+    setMediaType("image");
+    setMediaFiles((prev) => [...prev, ...images].slice(0, MAX_IMAGES));
+  }
 
-    e.target.value = "";
-  };
+  e.currentTarget.value = "";
+};
 
   /* ---------------------------
      Remove media
