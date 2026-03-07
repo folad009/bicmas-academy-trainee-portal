@@ -6,7 +6,7 @@ const BASE_URL =
 export async function fieldTask(
   moduleTitle: string,
   description: string,
-  files: File[]
+  files: File | File[]
 ) {
   const token = getAccessToken();
 
@@ -14,7 +14,9 @@ export async function fieldTask(
     throw new Error("Authentication token is missing");
   }
 
-  if (!files || files.length === 0) {
+  const fileArray = Array.isArray(files) ? files : [files];
+
+  if (fileArray.length === 0) {
     throw new Error("No files provided for upload");
   }
 
@@ -23,7 +25,7 @@ export async function fieldTask(
   formData.append("description", description);
 
   // append files individually
-  files.forEach((file) => {
+  fileArray.forEach((file) => {
     formData.append("media", file);
   });
 

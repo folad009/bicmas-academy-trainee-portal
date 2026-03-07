@@ -79,8 +79,32 @@ export const FieldAssessmentPage: React.FC<Props> = ({ userId }) => {
      Submit assessment
   ----------------------------*/
  const handleSubmit = async () => {
+  // Validate moduleTopic
+  if (!moduleTopic.trim()) {
+    setError("Module Topic is required");
+    return;
+  }
+
+  // Validate note
+  if (!note.trim()) {
+    setError("Description is required");
+    return;
+  }
+
+  // Validate media files
   if (!mediaFiles.length) {
-    alert("Upload up to 4 images or one video.");
+    setError("Please upload at least one file (up to 4 images or one video)");
+    return;
+  }
+
+  // Enforce media constraints
+  if (mediaType === "image" && mediaFiles.length > MAX_IMAGES) {
+    setError(`Please upload up to ${MAX_IMAGES} images`);
+    return;
+  }
+
+  if (mediaType === "video" && mediaFiles.length !== 1) {
+    setError("Please upload exactly one video");
     return;
   }
 
@@ -88,10 +112,8 @@ export const FieldAssessmentPage: React.FC<Props> = ({ userId }) => {
   setError(null);
 
   try {
-    // Upload files sequentially
-    for (const file of mediaFiles) {
-      await fieldTask(moduleTopic, note, file);
-    }
+    // Submit all files atomically in a single request
+    await fieldTask(moduleTopic, note, mediaFiles);
 
     alert("Assessment submitted successfully!");
 
@@ -105,7 +127,6 @@ export const FieldAssessmentPage: React.FC<Props> = ({ userId }) => {
     const message = err instanceof Error ? err.message : "Unknown error";
     setError(message);
     console.error("Assessment submission failed:", message);
-    alert(message);
   } finally {
     setLoading(false);
   }
