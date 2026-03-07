@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { getAccessToken } from "../utils/auth";
 import { X } from "lucide-react";
 
@@ -13,69 +13,53 @@ const MAX_IMAGES = 4;
 export const FieldAssessmentPage: React.FC<Props> = ({ userId }) => {
   const [mediaType, setMediaType] = useState<MediaType>(null);
   const [mediaFiles, setMediaFiles] = useState<File[]>([]);
+  const [mediaUrls, setMediaUrls] = useState<string[]>([]);
   const [note, setNote] = useState("");
   const [moduleTopic, setModuleTopic] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Create stable object URLs from images, with cleanup
-  const mediaUrls = useMemo(() => {
-    return mediaFiles.map((file) => URL.createObjectURL(file));
+  /* ---------------------------
+     Create object URLs safely
+  ----------------------------*/
+  useEffect(() => {
+    const urls = mediaFiles.map((file) => URL.createObjectURL(file));
+    setMediaUrls(urls);
+
+    return () => {
+      urls.forEach((url) => URL.revokeObjectURL(url));
+    };
   }, [mediaFiles]);
 
-  // Revoke object URLs when component unmounts or images change
-  useEffect(() => {
-    return () => {
-      mediaUrls.forEach((url) => URL.revokeObjectURL(url));
-    };
-  }, [mediaUrls]);
-
-  // ----------------------------
-  // Media handling (max 4, or 1 video)
-  // ----------------------------
+  /* ---------------------------
+     Handle media selection
+  ----------------------------*/
   const handleMedia = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files) return;
+    const files = e.currentTarget.files;
 
-    const files: File[] = Array.from(e.target.files);
+    if (!files) return;
 
-    if (files.length === 0) return;
-
-    // Filter files by MIME type
-    const videos = files.filter((f) => f.type.startsWith("video/"));
+    const video = files.find((f) => f.type.startsWith("video/"));
     const images = files.filter((f) => f.type.startsWith("image/"));
 
-    // Prevent conflicting media selections
-    // If videos are being selected but images already exist, prevent video selection
-    if (videos.length > 0 && mediaType === "image" && mediaFiles.length > 0) {
-      console.warn("Cannot add videos while images are already selected. Please remove existing images first.");
-      e.target.value = "";
-      return;
-    }
-
-    // If images are being selected but a video already exists, prevent image selection
-    if (images.length > 0 && mediaType === "video" && mediaFiles.length > 0) {
-      console.warn("Cannot add images while a video is already selected. Please remove the video first.");
-      e.target.value = "";
-      return;
-    }
-
-    // Determine type and set media
-    if (videos.length > 0) {
-      // Only one video allowed
+    if (video) {
       setMediaType("video");
-      setMediaFiles([videos[0]]);
-    } else if (images.length > 0) {
-      setMediaType("image");
-      setMediaFiles((prev) => {
-        const combined = [...prev, ...images];
-        return combined.slice(0, MAX_IMAGES);
-      });
+      setMediaFiles([video]);
+      e.target.value = "";
+      return;
     }
-    // Non-image/non-video files are ignored
+
+    if (images.length > 0) {
+      setMediaType("image");
+      setMediaFiles((prev) => [...prev, ...images].slice(0, MAX_IMAGES));
+    }
 
     e.target.value = "";
   };
 
+  /* ---------------------------
+     Remove media
+  ----------------------------*/
   const removeMedia = (index?: number) => {
     if (mediaType === "video") {
       setMediaFiles([]);
@@ -83,101 +67,84 @@ export const FieldAssessmentPage: React.FC<Props> = ({ userId }) => {
       return;
     }
 
-    if (mediaType === "image" && index !== undefined) {
-      setMediaFiles((prev) => {
-        const updated = prev.filter((_, i) => i !== index);
-        if (updated.length === 0) setMediaType(null);
-        return updated;
-      });
+    if (index !== undefined) {
+      const updated = mediaFiles.filter((_, i) => i !== index);
+      setMediaFiles(updated);
+      if (updated.length === 0) setMediaType(null);
     }
   };
 
-  // ----------------------------
-  // Submit
-  // ----------------------------
+  /* ---------------------------
+     Submit assessment
+  ----------------------------*/
   const handleSubmit = async () => {
-    if (mediaFiles.length === 0) {
+    if (!mediaFiles.length) {
       alert("Upload up to 4 images or one video.");
       return;
-    }
-
-    const formData = new FormData();
-    formData.append("userId", userId);
-    formData.append("moduleTopic", moduleTopic);
-    formData.append("note", note);
-
-    if (mediaType === "video") {
-      formData.append("video", mediaFiles[0]);
-    } else {
-      mediaFiles.forEach((file) => formData.append("images", file));
     }
 
     setLoading(true);
     setError(null);
 
     try {
-      const response = await fetch("/api/fieldTask", {
+      const token = getAccessToken();
+      if (!token) throw new Error("Authentication required");
+
+      const formData = new FormData();
+      formData.append("userId", userId);
+      formData.append("moduleTopic", moduleTopic);
+      formData.append("note", note);
+
+      if (mediaType === "video") {
+        formData.append("video", mediaFiles[0]);
+      } else {
+        mediaFiles.forEach((file) => formData.append("images", file));
+      }
+
+      const res = await fetch("https://bicmas-academy-main-backend-production.up.railway.app/api/v1/field-tasks", {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${getAccessToken()}`,
+          Authorization: `Bearer ${token}`,
         },
         body: formData,
       });
 
-      // Check response status
-      if (!response.ok) {
-        let errorMessage = "Failed to submit assessment";
-        // Read response body once as text
-        let body = "";
+      const text = await res.text();
+
+      if (!res.ok) {
+        let message = `Server error (${res.status})`;
+
         try {
-          body = await response.text();
+          const json = JSON.parse(text);
+          message = json.message || message;
         } catch {
-          body = "";
+          if (text) message = text;
         }
 
-        // Try to parse as JSON to extract message
-        if (body) {
-          try {
-            const errorData = JSON.parse(body);
-            errorMessage =
-              errorData.message || `Server error (${response.status}): ${body}`;
-          } catch {
-            // If not valid JSON, use raw body text
-            errorMessage = `Server error (${response.status}): ${body}`;
-          }
-        } else {
-          errorMessage = `Server error (${response.status})`;
-        }
-
-        setError(errorMessage);
-        console.error("Assessment submission failed", {
-          status: response.status,
-          error: errorMessage,
-        });
-        alert(errorMessage);
-        return;
+        throw new Error(message);
       }
 
-      // Reset after success
+      alert("Assessment submitted successfully!");
+
       setMediaFiles([]);
       setMediaType(null);
       setModuleTopic("");
       setNote("");
       setError(null);
-      alert("Assessment submitted successfully!");
-    } catch (e) {
-      const message = e instanceof Error ? e.message : "Unknown error";
+
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unknown error";
       setError(message);
-      console.error("Assessment submission error", e);
+      console.error("Assessment submission failed:", message);
       alert(message);
     } finally {
       setLoading(false);
     }
   };
 
-  // ----------------------------
-  // UI
-  // ----------------------------
+  /* ---------------------------
+     UI
+  ----------------------------*/
   return (
     <div className="max-w-3xl mx-auto space-y-6">
       <div className="bg-white border rounded-2xl p-6 space-y-4">
@@ -191,7 +158,7 @@ export const FieldAssessmentPage: React.FC<Props> = ({ userId }) => {
           placeholder="Module Topic"
           value={moduleTopic}
           onChange={(e) => setModuleTopic(e.target.value)}
-          className="w-full border rounded-lg p-3 mb-2"
+          className="w-full border rounded-lg p-3"
         />
 
         <textarea
@@ -201,30 +168,23 @@ export const FieldAssessmentPage: React.FC<Props> = ({ userId }) => {
           className="w-full border rounded-lg p-3"
         />
 
-        {/* Image upload */}
-        <div>
-          <label className="block text-sm font-medium mb-1">
-            Upload Media (Max 4 images or 1 video)
-          </label>
-          <input
-            type="file"
-            accept="image/*,video/*"
-            multiple={mediaType !== "video"}
-            disabled={
-              mediaType === "video" ||
-              (mediaType === "image" && mediaFiles.length >= MAX_IMAGES)
-            }
-            onChange={handleMedia}
-          />
-        </div>
+        <input
+          type="file"
+          accept="image/*,video/*"
+          multiple={mediaType !== "video"}
+          disabled={
+            mediaType === "video" ||
+            (mediaType === "image" && mediaFiles.length >= MAX_IMAGES)
+          }
+          onChange={handleMedia}
+        />
 
-        {mediaType === "image" && mediaFiles.length > 0 && (
+        {mediaType === "image" && (
           <div className="flex gap-3 flex-wrap">
             {mediaUrls.map((url, i) => (
               <div key={i} className="relative">
                 <img
                   src={url}
-                  alt={`Assessment image ${i + 1}`}
                   className="w-24 h-24 object-cover rounded-lg border"
                 />
                 <button
@@ -238,7 +198,7 @@ export const FieldAssessmentPage: React.FC<Props> = ({ userId }) => {
           </div>
         )}
 
-        {mediaType === "video" && mediaFiles[0] && (
+        {mediaType === "video" && mediaUrls[0] && (
           <div className="relative">
             <video
               src={mediaUrls[0]}
@@ -261,6 +221,10 @@ export const FieldAssessmentPage: React.FC<Props> = ({ userId }) => {
         >
           {loading ? "Submitting..." : "Submit Assessment"}
         </button>
+
+        {error && (
+          <p className="text-red-500 text-sm">{error}</p>
+        )}
       </div>
     </div>
   );
