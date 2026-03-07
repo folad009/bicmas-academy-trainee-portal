@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { fieldTask } from "../api/fieldTask";
 import { X } from "lucide-react";
+import { fieldTask } from "../api/fieldTask";
 
 type Props = {
   userId: string;
@@ -12,133 +12,100 @@ const MAX_IMAGES = 4;
 
 export const FieldAssessmentPage: React.FC<Props> = ({ userId }) => {
   const [mediaType, setMediaType] = useState<MediaType>(null);
-  const [mediaFiles, setMediaFiles] = useState<File[]>([]);
-  const [mediaUrls, setMediaUrls] = useState<string[]>([]);
-  const [note, setNote] = useState("");
+  const [files, setFiles] = useState<File[]>([]);
+  const [urls, setUrls] = useState<string[]>([]);
   const [moduleTopic, setModuleTopic] = useState("");
+  const [note, setNote] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  /* ---------------------------
-     Create object URLs safely
-  ----------------------------*/
+  /* Create preview URLs */
   useEffect(() => {
-    const urls = mediaFiles.map((file) => URL.createObjectURL(file));
-    setMediaUrls(urls);
+    const previewUrls = files.map((file) => URL.createObjectURL(file));
+    setUrls(previewUrls);
 
-    return () => {
-      urls.forEach((url) => URL.revokeObjectURL(url));
-    };
-  }, [mediaFiles]);
+    return () => previewUrls.forEach((u) => URL.revokeObjectURL(u));
+  }, [files]);
 
-  /* ---------------------------
-     Handle media selection
-  ----------------------------*/
- const handleMedia = (e: React.ChangeEvent<HTMLInputElement>) => {
-  const fileList = e.currentTarget.files;
-  if (!fileList) return;
+  /* Handle media selection */
+  const handleMedia = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const fileList = e.currentTarget.files;
+    if (!fileList) return;
 
-  const files = Array.from(fileList) as File[];
+    const selected = Array.from<File>(fileList);
 
-  const video = files.find((f) => f.type.startsWith("video/"));
-  const images = files.filter((f) => f.type.startsWith("image/"));
+    const video = selected.find((f) => f.type.startsWith("video/"));
+    const images = selected.filter((f) => f.type.startsWith("image/"));
 
-  if (video) {
-    setMediaType("video");
-    setMediaFiles([video]);
+    if (video) {
+      setMediaType("video");
+      setFiles([video]);
+    } else if (images.length) {
+      setMediaType("image");
+      setFiles((prev) => [...prev, ...images].slice(0, MAX_IMAGES));
+    }
+
     e.currentTarget.value = "";
-    return;
-  }
+  };
 
-  if (images.length > 0) {
-    setMediaType("image");
-    setMediaFiles((prev) => [...prev, ...images].slice(0, MAX_IMAGES));
-  }
-
-  e.currentTarget.value = "";
-};
-
-  /* ---------------------------
-     Remove media
-  ----------------------------*/
+  /* Remove media */
   const removeMedia = (index?: number) => {
     if (mediaType === "video") {
-      setMediaFiles([]);
+      setFiles([]);
       setMediaType(null);
       return;
     }
 
     if (index !== undefined) {
-      const updated = mediaFiles.filter((_, i) => i !== index);
-      setMediaFiles(updated);
-      if (updated.length === 0) setMediaType(null);
+      const updated = files.filter((_, i) => i !== index);
+      setFiles(updated);
+      if (!updated.length) setMediaType(null);
     }
   };
 
-  /* ---------------------------
-     Submit assessment
-  ----------------------------*/
- const handleSubmit = async () => {
-  // Validate moduleTopic
-  if (!moduleTopic.trim()) {
-    setError("Module Topic is required");
-    return;
-  }
+  /* Submit */
+  const handleSubmit = async () => {
+    if (!files.length) {
+      alert("Upload up to 4 images or one video.");
+      return;
+    }
 
-  // Validate note
-  if (!note.trim()) {
-    setError("Description is required");
-    return;
-  }
+    if (!moduleTopic.trim()) {
+      alert("Module topic is required.");
+      return;
+    }
 
-  // Validate media files
-  if (!mediaFiles.length) {
-    setError("Please upload at least one file (up to 4 images or one video)");
-    return;
-  }
-
-  // Enforce media constraints
-  if (mediaType === "image" && mediaFiles.length > MAX_IMAGES) {
-    setError(`Please upload up to ${MAX_IMAGES} images`);
-    return;
-  }
-
-  if (mediaType === "video" && mediaFiles.length !== 1) {
-    setError("Please upload exactly one video");
-    return;
-  }
-
-  setLoading(true);
-  setError(null);
-
-  try {
-    // Submit all files atomically in a single request
-    await fieldTask(moduleTopic, note, mediaFiles);
-
-    alert("Assessment submitted successfully!");
-
-    setMediaFiles([]);
-    setMediaType(null);
-    setModuleTopic("");
-    setNote("");
+    setLoading(true);
     setError(null);
 
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown error";
-    setError(message);
-    console.error("Assessment submission failed:", message);
-  } finally {
-    setLoading(false);
-  }
-};
+    try {
+      /* Upload each file individually (API expects one file) */
+      for (const file of files) {
+        await fieldTask(moduleTopic, note, file);
+      }
 
-  /* ---------------------------
-     UI
-  ----------------------------*/
+      alert("Assessment submitted successfully!");
+
+      setFiles([]);
+      setUrls([]);
+      setMediaType(null);
+      setModuleTopic("");
+      setNote("");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Upload failed";
+      setError(message);
+      console.error("Assessment submission failed:", message);
+      alert(message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="max-w-3xl mx-auto space-y-6">
       <div className="bg-white border rounded-2xl p-6 space-y-4">
         <h2 className="text-xl font-bold">Field Task</h2>
+
         <p className="text-slate-500">
           Upload up to 4 photos or one video as proof of field activity.
         </p>
@@ -164,14 +131,15 @@ export const FieldAssessmentPage: React.FC<Props> = ({ userId }) => {
           multiple={mediaType !== "video"}
           disabled={
             mediaType === "video" ||
-            (mediaType === "image" && mediaFiles.length >= MAX_IMAGES)
+            (mediaType === "image" && files.length >= MAX_IMAGES)
           }
           onChange={handleMedia}
         />
 
+        {/* Image preview */}
         {mediaType === "image" && (
           <div className="flex gap-3 flex-wrap">
-            {mediaUrls.map((url, i) => (
+            {urls.map((url, i) => (
               <div key={i} className="relative">
                 <img
                   src={url}
@@ -188,10 +156,11 @@ export const FieldAssessmentPage: React.FC<Props> = ({ userId }) => {
           </div>
         )}
 
-        {mediaType === "video" && mediaUrls[0] && (
+        {/* Video preview */}
+        {mediaType === "video" && urls[0] && (
           <div className="relative">
             <video
-              src={mediaUrls[0]}
+              src={urls[0]}
               controls
               className="w-full max-h-64 rounded-lg border"
             />
@@ -212,9 +181,7 @@ export const FieldAssessmentPage: React.FC<Props> = ({ userId }) => {
           {loading ? "Submitting..." : "Submit Assessment"}
         </button>
 
-        {error && (
-          <p className="text-red-500 text-sm">{error}</p>
-        )}
+        {error && <p className="text-red-500 text-sm">{error}</p>}
       </div>
     </div>
   );
