@@ -16,7 +16,7 @@ export async function fieldTask(
   if (!token) throw new Error("No access token");
 
   const formData = new FormData();
-  formData.append("module title", moduleTitle);
+  formData.append("moduleTitle", moduleTitle);
   formData.append("description", description);
   formData.append("media", file);
 
@@ -24,8 +24,6 @@ export async function fieldTask(
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,
-      // DO NOT set Content-Type manually
-      // Browser will set multipart boundary automatically
     },
     body: formData,
   });
