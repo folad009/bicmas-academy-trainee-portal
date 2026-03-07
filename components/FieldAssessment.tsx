@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { getAccessToken } from "../utils/auth";
+import { fieldTask } from "../api/fieldTask";
 import { X } from "lucide-react";
 
 type Props = {
@@ -78,70 +78,38 @@ export const FieldAssessmentPage: React.FC<Props> = ({ userId }) => {
   /* ---------------------------
      Submit assessment
   ----------------------------*/
-  const handleSubmit = async () => {
-    if (!mediaFiles.length) {
-      alert("Upload up to 4 images or one video.");
-      return;
+ const handleSubmit = async () => {
+  if (!mediaFiles.length) {
+    alert("Upload up to 4 images or one video.");
+    return;
+  }
+
+  setLoading(true);
+  setError(null);
+
+  try {
+    // Upload files sequentially
+    for (const file of mediaFiles) {
+      await fieldTask(moduleTopic, note, file);
     }
 
-    setLoading(true);
+    alert("Assessment submitted successfully!");
+
+    setMediaFiles([]);
+    setMediaType(null);
+    setModuleTopic("");
+    setNote("");
     setError(null);
 
-    try {
-      const token = getAccessToken();
-      if (!token) throw new Error("Authentication required");
-
-      const formData = new FormData();
-      formData.append("userId", userId);
-      formData.append("moduleTopic", moduleTopic);
-      formData.append("note", note);
-
-      if (mediaType === "video") {
-        formData.append("video", mediaFiles[0]);
-      } else {
-        mediaFiles.forEach((file) => formData.append("images", file));
-      }
-
-      const res = await fetch("https://bicmas-academy-main-backend-production.up.railway.app/api/v1/field-tasks", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-        body: formData,
-      });
-
-      const text = await res.text();
-
-      if (!res.ok) {
-        let message = `Server error (${res.status})`;
-
-        try {
-          const json = JSON.parse(text);
-          message = json.message || message;
-        } catch {
-          if (text) message = text;
-        }
-
-        throw new Error(message);
-      }
-
-      alert("Assessment submitted successfully!");
-
-      setMediaFiles([]);
-      setMediaType(null);
-      setModuleTopic("");
-      setNote("");
-      setError(null);
-
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Unknown error";
-      setError(message);
-      console.error("Assessment submission failed:", message);
-      alert(message);
-    } finally {
-      setLoading(false);
-    }
-  };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown error";
+    setError(message);
+    console.error("Assessment submission failed:", message);
+    alert(message);
+  } finally {
+    setLoading(false);
+  }
+};
 
   /* ---------------------------
      UI

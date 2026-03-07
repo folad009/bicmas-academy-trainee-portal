@@ -6,7 +6,7 @@ const BASE_URL =
 export async function fieldTask(
   moduleTitle: string,
   description: string,
-  file: File
+  files: File[]
 ) {
   const token = getAccessToken();
 
@@ -14,14 +14,18 @@ export async function fieldTask(
     throw new Error("Authentication token is missing");
   }
 
-  if (!file) {
-    throw new Error("No file provided for upload");
+  if (!files || files.length === 0) {
+    throw new Error("No files provided for upload");
   }
 
   const formData = new FormData();
   formData.append("moduleTitle", moduleTitle);
   formData.append("description", description);
-  formData.append("media", file);
+
+  // append files individually
+  files.forEach((file) => {
+    formData.append("media", file);
+  });
 
   try {
     const response = await fetch(`${BASE_URL}/api/v1/field-tasks`, {
@@ -40,7 +44,6 @@ export async function fieldTask(
 
     const result = await response.json();
     return result?.data ?? result;
-
   } catch (error) {
     console.error("Field task request crashed:", error);
     throw error;
