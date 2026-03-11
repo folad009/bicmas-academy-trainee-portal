@@ -1,16 +1,22 @@
-const ACCESS_TOKEN_KEY = 'bicmas_access_token';
-const REFRESH_TOKEN_KEY = 'bicmas_refresh_token';
+const TOKEN_KEY = "access_token";
+const USER_KEY = "auth_user";
 
-export function saveAuth(accessToken: string, refreshToken: string) {
-  localStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
-  localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
-}
+export const getAccessToken = () => localStorage.getItem(TOKEN_KEY);
 
-export function clearAuth() {
-  localStorage.removeItem(ACCESS_TOKEN_KEY);
-  localStorage.removeItem(REFRESH_TOKEN_KEY);
-}
+export const setAccessToken = (token: string) => {
+  localStorage.setItem(TOKEN_KEY, token);
+};
 
-export function getAccessToken() {
-  return localStorage.getItem(ACCESS_TOKEN_KEY);
-}
+export const getStoredUser = () => {
+  const raw = localStorage.getItem(USER_KEY);
+  return raw ? JSON.parse(raw) : null;
+};
+
+export const setStoredUser = (user: any) => {
+  localStorage.setItem(USER_KEY, JSON.stringify(user));
+};
+
+export const clearAuth = () => {
+  localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(USER_KEY);
+};

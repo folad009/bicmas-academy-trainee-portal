@@ -9,7 +9,7 @@ import { Course, CourseStatus, User, UserStats } from "./types";
 import { Search, Download, LogOut, Filter } from "lucide-react";
 import { CourseCard } from "./components/CourseCard";
 
-import { clearAuth, getAccessToken } from "./utils/auth";
+import { clearAuth, getAccessToken, getStoredUser, setStoredUser } from "./utils/auth";
 import {
   getDownloadedCourses,
   markDownloaded,
@@ -49,8 +49,8 @@ const DEFAULT_STATS: UserStats = {
 
 export default function App() {
   // ---------------- Auth ----------------
-  const [isAuthenticated, setIsAuthenticated] = useState(!!getAccessToken());
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<User | null>(() => getStoredUser())
+  const isAuthenticated = !!getAccessToken() && !!user
 
   // ---------------- UI State ----------------
   const [activeView, setActiveView] = useState("dashboard");
@@ -128,20 +128,22 @@ export default function App() {
 
   // ---------------- Auth Handlers ----------------
   const handleLogin = (backendUser: any) => {
-    setUser({
+    const formatedUser: User = {
       id: backendUser.id,
       name: backendUser.email.split("@")[0],
       email: backendUser.email,
       role: backendUser.role,
       avatar: "https://picsum.photos/200",
-    });
+    }
 
-    setIsAuthenticated(true);
+    setUser(formatedUser);
+    setStoredUser(formatedUser)
+
+    
   };
 
   const handleLogout = () => {
     clearAuth();
-    setIsAuthenticated(false);
     setUser(null);
     setActiveCourseId(null);
     setActiveView("dashboard");
