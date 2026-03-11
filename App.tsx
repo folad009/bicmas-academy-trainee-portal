@@ -127,19 +127,17 @@ export default function App() {
     null;
 
   // ---------------- Auth Handlers ----------------
-  const handleLogin = (backendUser: any) => {
-    const formatedUser: User = {
+  const handleLogin = (backendUser: { id: string; email: string; role: string }) => {
+    const formattedUser: User = {
       id: backendUser.id,
-      name: backendUser.email.split("@")[0],
+      name: backendUser.email?.split("@")[0] ?? "User",
       email: backendUser.email,
-      role: backendUser.role,
+      role: "Trainee",
       avatar: "https://picsum.photos/200",
-    }
+    };
 
-    setUser(formatedUser);
-    setStoredUser(formatedUser)
-
-    
+    setUser(formattedUser);
+    setStoredUser(formattedUser);
   };
 
   const handleLogout = () => {

@@ -9,7 +9,15 @@ export const setAccessToken = (token: string) => {
 
 export const getStoredUser = () => {
   const raw = localStorage.getItem(USER_KEY);
-  return raw ? JSON.parse(raw) : null;
+  if (!raw) return null;
+  
+  try {
+    return JSON.parse(raw);
+  } catch (error) {
+    console.error("Failed to parse stored user data:", error);
+    localStorage.removeItem(USER_KEY);
+    return null;
+  }
 };
 
 export const setStoredUser = (user: any) => {
