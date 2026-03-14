@@ -28,3 +28,8 @@ export const clearAuth = () => {
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(USER_KEY);
 };
+
+export const saveAuth = (accessToken: string, user: any) => {
+  localStorage.setItem("access_token", accessToken);
+  localStorage.setItem("auth_user", JSON.stringify(user));
+};

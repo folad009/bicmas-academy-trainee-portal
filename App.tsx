@@ -9,7 +9,7 @@ import { Course, CourseStatus, User, UserStats } from "./types";
 import { Search, Download, LogOut, Filter } from "lucide-react";
 import { CourseCard } from "./components/CourseCard";
 
-import { clearAuth, getAccessToken, getStoredUser, setStoredUser } from "./utils/auth";
+import { clearAuth, getAccessToken, getStoredUser, setAccessToken, setStoredUser } from "./utils/auth";
 import {
   getDownloadedCourses,
   markDownloaded,
@@ -127,17 +127,22 @@ export default function App() {
     null;
 
   // ---------------- Auth Handlers ----------------
-  const handleLogin = (backendUser: { id: string; email: string; role: string }) => {
+  const handleLogin = (data: {
+    accessToken: string,
+    user: {id: string; email: string; role: string; }
+  }) => {
     const formattedUser: User = {
-      id: backendUser.id,
-      name: backendUser.email?.split("@")[0] ?? "User",
-      email: backendUser.email,
+      id: data.user.id,
+      name: data.user.email?.split("@")[0] ?? "User",
+      email: data.user.email,
       role: "Trainee",
       avatar: "https://picsum.photos/200",
     };
 
-    setUser(formattedUser);
+    setAccessToken(data.accessToken);
     setStoredUser(formattedUser);
+    setUser(formattedUser);
+    
   };
 
   const handleLogout = () => {

@@ -1,11 +1,12 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import App from "./App";
 import { QueryClientProvider } from "@tanstack/react-query";
+
+import App from "./App";
 import { queryClient } from "./state/queryClient";
 
-
 const rootElement = document.getElementById("root");
+
 if (!rootElement) {
   throw new Error("Could not find root element to mount to");
 }
@@ -21,9 +22,14 @@ root.render(
 );
 
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker
-    .register("/service-worker.js")
-    .catch((err) => {
-      console.error("Service Worker registration failed:", err);
-    });
+  window.addEventListener("load", () => {
+    navigator.serviceWorker
+      .register("/service-worker.js")
+      .then((registration) => {
+        console.log("Service Worker registered:", registration);
+      })
+      .catch((err) => {
+        console.error("Service Worker registration failed:", err);
+      });
+  });
 }
