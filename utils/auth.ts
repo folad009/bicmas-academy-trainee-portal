@@ -1,5 +1,6 @@
 const TOKEN_KEY = "access_token";
 const USER_KEY = "auth_user";
+const REFRESH_TOKEN_KEY = "refresh_token";
 
 export const getAccessToken = () => localStorage.getItem(TOKEN_KEY);
 
@@ -29,7 +30,8 @@ export const clearAuth = () => {
   localStorage.removeItem(USER_KEY);
 };
 
-export const saveAuth = (accessToken: string, user: any) => {
-  localStorage.setItem("access_token", accessToken);
-  localStorage.setItem("auth_user", JSON.stringify(user));
+export const saveAuth = (accessToken: string, refreshToken: string, user: any) => {
+  localStorage.setItem(TOKEN_KEY, accessToken);
+  localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
+  localStorage.setItem(USER_KEY, JSON.stringify(user));
 };

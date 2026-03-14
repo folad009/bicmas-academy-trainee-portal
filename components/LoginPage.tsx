@@ -31,7 +31,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
           ? await loginWithEmail(email, password)
           : await loginWithPhone(phoneNumber, password);
 
-      saveAuth(data.accessToken, data.user);
+      saveAuth(data.accessToken, data.user, data.refreshToken,);
       onLogin({
         accessToken: data.accessToken,
         user: data.user,
