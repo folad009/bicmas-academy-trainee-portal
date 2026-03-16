@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import {
   Course,
   CourseStatus,
@@ -25,9 +25,11 @@ import {
   Star,
   Medal,
   Trophy,
+  Bell,
 } from "lucide-react";
 
 import { useAnnouncementNotifications } from "../hooks/useAnnouncementNotifications";
+import { getAccessToken } from "@/utils/auth";
 
 interface DashboardProps {
   courses: Course[];
@@ -40,6 +42,26 @@ interface DashboardProps {
   user: User;
 }
 
+type InsightCardProps = {
+  label: string;
+  value: string | number;
+  icon: React.ElementType;
+  color: { bg: string; text: string };
+  trend?: string;
+  trendDirection?: "up" | "down";
+};
+
+interface Announcement {
+  id: string;
+  text: string;
+  createdAt: string;
+  user: {
+    fullName: string;
+  };
+}
+
+const API_BASE =
+  "https://bicmas-academy-main-backend-production.up.railway.app/api/v1";
 
 export const Dashboard: React.FC<DashboardProps> = ({
   courses,
@@ -54,19 +76,60 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const inProgress = courses.filter(
     (c) => c.status === CourseStatus.InProgress,
   );
+  const [announcements, setAnnouncements] = React.useState<Announcement[]>([]);
+
+  useEffect(() => {
+    const fetchAnnouncements = async () => {
+      try {
+        const token = getAccessToken();
+        console.log("Token:", token);
+
+        if (!token) {
+          return;
+        }
+
+        const res = await fetch(`${API_BASE}/announcements`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        if (res.status === 401) {
+          console.warn("Unauthorized fetching announcements");
+          return;
+        }
+
+        if (!res.ok) {
+          throw new Error(`Failed to fetch announcements: ${res.status}`);
+        }
+
+        const result = await res.json();
+        const data = Array.isArray(result?.data) ? result.data : [];
+
+        data.sort(
+          (a: Announcement, b: Announcement) =>
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+        );
+
+        setAnnouncements(data);
+      } catch (err) {
+        console.error("Failed to load announcements", err);
+      }
+    };
+
+    fetchAnnouncements();
+  }, []);
 
   useAnnouncementNotifications();
 
   // --- Widget Components --- //
 
-  const InsightCard = ({
+  const InsightCard: React.FC<InsightCardProps> = ({
     label,
     value,
     icon: Icon,
     color,
     trend,
     trendDirection = "up",
-  }: any) => (
+  }) => (
     <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex flex-col justify-between h-32 hover:shadow-md transition-shadow">
       <div className="flex justify-between items-start">
         <div
@@ -169,7 +232,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
         <div className="p-6 flex-1 overflow-y-auto custom-scrollbar">
           <div className="relative space-y-0">
             {/* Vertical Line */}
-            <div className="absolute left-[19px] top-4 bottom-4 w-0.5 bg-slate-100 z-0"></div>
+            <div className="absolute left-4.75 top-4 bottom-4 w-0.5 bg-slate-100 z-0"></div>
 
             {path.steps?.map((step, idx) => {
               const isCurrent = step.status === "in-progress";
@@ -360,7 +423,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
       </section>
 
       {/* 2. Main Dashboard Split: Learning Path & Activity */}
-      <section className="w-full grid grid-cols-1 lg:grid-cols-3 gap-6 mni-h-screen">
+      <section className="w-full grid grid-cols-1 lg:grid-cols-3 gap-6 min-h-screen">
         {/* Left: Learning Path (Takes 2 columns on large screens) */}
         <div className="lg:col-span-2 h-full">
           {learningPath ? (
@@ -378,8 +441,30 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <WeeklyActivityChart data={stats.weeklyActivity} />
           </div>
 
+          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
+  <h3 className="font-bold text-[#008080] mb-4 flex items-center gap-2">
+    <Bell /> Announcements
+  </h3>
+
+  <div className="space-y-3 max-h-64 overflow-y-auto">
+    {announcements.map((announcement) => (
+      <div
+        key={announcement.id}
+        className="p-3 bg-slate-50 border border-slate-100 rounded-lg text-sm"
+      >
+        <p className="text-slate-700">{announcement.text}</p>
+
+        <span className="text-xs text-slate-400 block mt-1">
+          {new Date(announcement.createdAt).toLocaleDateString()} •{" "}
+          {announcement.user.fullName}
+        </span>
+      </div>
+    ))}
+  </div>
+</div>
+
           {/* Mini 'Next Up' Card */}
-          <div className="bg-gradient-to-br from-[#008080]/50 to-[#008080] rounded-2xl p-6 text-white shadow-lg flex-1 flex flex-col justify-center">
+          <div className="bg-[#008080] rounded-2xl p-6 text-white shadow-lg flex-1 flex flex-col justify-center">
             <div className="flex items-start justify-between mb-4">
               <div className="bg-white/20 p-2 rounded-lg backdrop-blur-sm">
                 <BookOpen size={20} />
