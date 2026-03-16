@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { Layout } from "./components/Layout";
 import { Dashboard } from "./components/Dashboard";
 import { ScormPlayer } from "./components/ScormPlayer";
@@ -15,6 +15,7 @@ import {
   markDownloaded,
   removeDownloaded,
 } from "./utils/offlineCourses";
+import { registerPushNotifications } from "./utils/pushService";
 
 import { useDashboard } from "@/hooks/useDashboard";
 import { useLibrary } from "@/hooks/useLibrary";
@@ -174,6 +175,10 @@ export default function App() {
   const handleRemoveDownload = (courseId: string) => {
     removeDownloaded(courseId);
   };
+
+  useEffect(() => {
+  registerPushNotifications();
+}, []);
 
   // ---------------- Views ----------------
   const renderLibrary = () => (

@@ -27,6 +27,8 @@ import {
   Trophy,
 } from "lucide-react";
 
+import { useAnnouncementNotifications } from "../hooks/useAnnouncementNotifications";
+
 interface DashboardProps {
   courses: Course[];
   learningPath?: LearningPath | null;
@@ -37,6 +39,7 @@ interface DashboardProps {
   isOfflineMode: boolean;
   user: User;
 }
+
 
 export const Dashboard: React.FC<DashboardProps> = ({
   courses,
@@ -52,12 +55,13 @@ export const Dashboard: React.FC<DashboardProps> = ({
     (c) => c.status === CourseStatus.InProgress,
   );
 
-  // --- Widget Components ---
+  useAnnouncementNotifications();
+
+  // --- Widget Components --- //
 
   const InsightCard = ({
     label,
     value,
-    subtext,
     icon: Icon,
     color,
     trend,
@@ -123,7 +127,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             >
               <div className="w-full relative h-32 bg-slate-50 rounded-lg overflow-hidden flex items-end">
                 <div
-                  className="w-full bg-[#008080]/70 hover:bg-[#008080]transition-all duration-500 rounded-t-lg"
+                  className="w-full bg-[#008080]/70 hover:bg-[#008080] transition-all duration-500 rounded-t-lg"
                   style={{
                     height: `${(val / maxVal) * 100}%`,
                     opacity: val === 0 ? 0 : 1,
@@ -149,7 +153,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden h-full flex flex-col">
         <div className="p-6 border-b border-slate-50 bg-slate-50/50">
           <div className="flex justify-between items-start mb-2">
-            <div className="flex text-xl items-center gap-2 text-[#008080] font-semibold text-sm uppercase tracking-wide">
+            <div className="flex text-xl items-center gap-2 text-[#008080] font-semibold uppercase tracking-wide">
               <Map size={20} /> Learning Path
             </div>
             <div className="bg-indigo-100 text-indigo-700 text-xs font-bold px-2 py-1 rounded-md">
@@ -165,7 +169,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
         <div className="p-6 flex-1 overflow-y-auto custom-scrollbar">
           <div className="relative space-y-0">
             {/* Vertical Line */}
-            <div className="absolute left-[19px] top-4 bottom-4 w-0.5 bg-slate-100 z-0"></div>
+            <div className="absolute left-4.75 top-4 bottom-4 w-0.5 bg-slate-100 z-0"></div>
 
             {path.steps?.map((step, idx) => {
               const isCurrent = step.status === "in-progress";
@@ -275,7 +279,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             return (
               <div
                 key={badge.id}
-                className={`flex-shrink-0 w-32 p-4 rounded-xl border flex flex-col items-center text-center gap-3 transition-colors ${badge.isLocked ? "bg-slate-50 border-slate-100 opacity-60" : "bg-yellow-50/30 border-yellow-100"}`}
+                className={`shrink-0 w-32 p-4 rounded-xl border flex flex-col items-center text-center gap-3 transition-colors ${badge.isLocked ? "bg-slate-50 border-slate-100 opacity-60" : "bg-yellow-50/30 border-yellow-100"}`}
               >
                 <div
                   className={`w-12 h-12 rounded-full flex items-center justify-center ${badge.isLocked ? "bg-slate-200 text-slate-400" : "bg-yellow-100 text-yellow-600 shadow-sm"}`}
@@ -320,7 +324,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-         
           <InsightCard
             label="BICMAS Coins"
             value={stats.bicmasCoins}
@@ -376,7 +379,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </div>
 
           {/* Mini 'Next Up' Card */}
-          <div className="bg-gradient-to-br from-[#008080]/50 to-[#008080] rounded-2xl p-6 text-white shadow-lg flex-1 flex flex-col justify-center">
+          <div className="bg-linear-to-br from-[#008080]/50 to-[#008080] rounded-2xl p-6 text-white shadow-lg flex-1 flex flex-col justify-center">
             <div className="flex items-start justify-between mb-4">
               <div className="bg-white/20 p-2 rounded-lg backdrop-blur-sm">
                 <BookOpen size={20} />
@@ -385,7 +388,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 Recommended
               </span>
             </div>
-            
+
             <h4 className="font-bold text-lg mb-2">
               {currentCourse?.title || "You're all caught up"}
             </h4>

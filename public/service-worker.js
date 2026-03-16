@@ -1,27 +1,83 @@
-const CACHE_NAME = "bicmas-app-v2";
+const CACHE_NAME = "bicmas-app-v3";
 
+/* ---------------- INSTALL ---------------- */
 self.addEventListener("install", (event) => {
   self.skipWaiting();
 });
 
+/* ---------------- ACTIVATE ---------------- */
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(
-        keys
-          .filter((key) => key !== CACHE_NAME)
-          .map((key) => caches.delete(key))
+    caches
+      .keys()
+      .then((keys) =>
+        Promise.all(
+          keys
+            .filter((key) => key !== CACHE_NAME)
+            .map((key) => caches.delete(key))
+        )
       )
-    ).then(() => self.clients.claim())
+      .then(() => self.clients.claim())
   );
 });
 
+/* ---------------- PUSH EVENT ---------------- */
+self.addEventListener("push", (event) => {
+  let data = {};
+
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch {
+    data = {
+      title: "BICMAS Announcement",
+      body: event.data?.text(),
+    };
+  }
+
+  const title = data.title || "BICMAS Announcement";
+
+  const options = {
+    body: data.body || "New announcement available",
+    icon: "/logo.png",
+    badge: "/logo.png",
+    tag: "bicmas-announcement",
+    data: {
+      url: data.url || "/",
+    },
+  };
+
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+/* ---------------- NOTIFICATION CLICK ---------------- */
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+
+  const targetUrl = event.notification.data?.url || "/";
+
+  event.waitUntil(
+    clients.matchAll({ type: "window", includeUncontrolled: true }).then(
+      (clientList) => {
+        for (const client of clientList) {
+          if (client.url === targetUrl && "focus" in client) {
+            return client.focus();
+          }
+        }
+        if (clients.openWindow) {
+          return clients.openWindow(targetUrl);
+        }
+      }
+    )
+  );
+});
+
+/* ---------------- FETCH / CACHING ---------------- */
 self.addEventListener("fetch", (event) => {
   const { request } = event;
 
   if (request.method !== "GET") return;
 
-  // HTML requests: always try network first
+  // HTML requests → network first
   if (request.headers.get("accept")?.includes("text/html")) {
     event.respondWith(
       fetch(request).catch(() => caches.match("/index.html"))
@@ -29,21 +85,25 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Static assets: cache first
+  // Static assets → cache first
   event.respondWith(
-  caches.match(request).then((cached) => {
-    return (
-      cached ||
-      fetch(request).then((response) => {
-        if (!response.ok || response.type === "opaque") {
-          return response;
-        }
+    caches.match(request).then((cached) => {
+      return (
+        cached ||
+        fetch(request).then((response) => {
+          if (!response.ok || response.type === "opaque") {
+            return response;
+          }
 
-        const copy = response.clone();
-        caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
-        return response;
-      })
-    );
-  })
-);
+          const copy = response.clone();
+
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(request, copy);
+          });
+
+          return response;
+        })
+      );
+    })
+  );
 });
