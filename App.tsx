@@ -177,8 +177,10 @@ export default function App() {
   };
 
   useEffect(() => {
-  registerPushNotifications();
-}, []);
+    if (!isAuthenticated) return;
+
+    registerPushNotifications();
+  }, [isAuthenticated]);
 
   // ---------------- Views ----------------
   const renderLibrary = () => (

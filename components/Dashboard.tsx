@@ -169,7 +169,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
         <div className="p-6 flex-1 overflow-y-auto custom-scrollbar">
           <div className="relative space-y-0">
             {/* Vertical Line */}
-            <div className="absolute left-4.75 top-4 bottom-4 w-0.5 bg-slate-100 z-0"></div>
+            <div className="absolute left-[19px] top-4 bottom-4 w-0.5 bg-slate-100 z-0"></div>
 
             {path.steps?.map((step, idx) => {
               const isCurrent = step.status === "in-progress";
@@ -379,7 +379,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </div>
 
           {/* Mini 'Next Up' Card */}
-          <div className="bg-linear-to-br from-[#008080]/50 to-[#008080] rounded-2xl p-6 text-white shadow-lg flex-1 flex flex-col justify-center">
+          <div className="bg-gradient-to-br from-[#008080]/50 to-[#008080] rounded-2xl p-6 text-white shadow-lg flex-1 flex flex-col justify-center">
             <div className="flex items-start justify-between mb-4">
               <div className="bg-white/20 p-2 rounded-lg backdrop-blur-sm">
                 <BookOpen size={20} />
