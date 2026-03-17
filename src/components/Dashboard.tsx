@@ -26,10 +26,16 @@ import {
   Medal,
   Trophy,
   Bell,
+  BellRing,
 } from "lucide-react";
 
 import { useAnnouncementNotifications } from "../hooks/useAnnouncementNotifications";
 import { getAccessToken } from "@/utils/auth";
+import {
+  getNotificationPermission,
+  hasEnabledNotifications,
+  registerPushNotifications,
+} from "@/utils/pushService";
 
 interface DashboardProps {
   courses: Course[];
@@ -77,6 +83,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
     (c) => c.status === CourseStatus.InProgress,
   );
   const [announcements, setAnnouncements] = React.useState<Announcement[]>([]);
+  const [notificationsEnabled, setNotificationsEnabled] = React.useState(
+    hasEnabledNotifications() && getNotificationPermission() === "granted",
+  );
+  const [notificationStatus, setNotificationStatus] = React.useState("");
+  const [isEnablingNotifications, setIsEnablingNotifications] = React.useState(false);
 
   useEffect(() => {
     const fetchAnnouncements = async () => {
@@ -118,7 +129,28 @@ export const Dashboard: React.FC<DashboardProps> = ({
     fetchAnnouncements();
   }, []);
 
-  useAnnouncementNotifications();
+  useAnnouncementNotifications(notificationsEnabled);
+
+  const handleEnableNotifications = async () => {
+    setIsEnablingNotifications(true);
+    setNotificationStatus("");
+
+    const subscription = await registerPushNotifications();
+    const permission = getNotificationPermission();
+
+    if (subscription) {
+      setNotificationsEnabled(true);
+      setNotificationStatus("Notifications enabled. We'll alert you about new announcements.");
+    } else if (permission === "denied") {
+      setNotificationsEnabled(false);
+      setNotificationStatus("Notifications are blocked in your browser settings.");
+    } else {
+      setNotificationsEnabled(false);
+      setNotificationStatus("Notifications were not enabled.");
+    }
+
+    setIsEnablingNotifications(false);
+  };
 
   // --- Widget Components --- //
 
@@ -369,7 +401,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-10">
       {/* 1. Header & Stats Overview */}
       <section>
-        <div className="flex flex-col md:flex-row justify-between items-end mb-6">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 mb-6">
           <div>
             <h1 className="text-3xl font-bold text-slate-900">Dashboard</h1>
             <p className="text-slate-500 mt-1">
@@ -384,6 +416,35 @@ export const Dashboard: React.FC<DashboardProps> = ({
               {learningPath?.title || "Van Sales Rep Certification"}
             </div>
           </div>
+        </div>
+
+        <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
+          <div>
+            <div className="flex items-center gap-2 text-slate-900 font-semibold">
+              <BellRing size={18} className="text-[#008080]" />
+              Stay updated with announcements
+            </div>
+            <p className="text-sm text-slate-500 mt-1">
+              Turn on browser notifications to receive new academy updates.
+            </p>
+            {notificationStatus && (
+              <p className="text-sm text-slate-600 mt-2">{notificationStatus}</p>
+            )}
+          </div>
+
+          <button
+            type="button"
+            onClick={handleEnableNotifications}
+            disabled={notificationsEnabled || isEnablingNotifications}
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#008080] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#006d6d] disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500"
+          >
+            <Bell size={16} />
+            {notificationsEnabled
+              ? "Notifications Enabled"
+              : isEnablingNotifications
+                ? "Enabling..."
+                : "Enable Notifications"}
+          </button>
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

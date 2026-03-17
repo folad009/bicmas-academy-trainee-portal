@@ -1,29 +1,29 @@
 import React, { useState, useMemo, useEffect } from "react";
-import { Layout } from "./components/Layout";
-import { Dashboard } from "./components/Dashboard";
-import { ScormPlayer } from "./components/ScormPlayer";
-import { LoginPage } from "./components/LoginPage";
-import { CertificateModal } from "./components/CertificateModal";
-import { Community } from "./components/Community";
-import { Course, CourseStatus, User, UserStats } from "./types";
+import { Layout } from "../components/Layout";
+import { Dashboard } from "../components/Dashboard";
+import { ScormPlayer } from "../components/ScormPlayer";
+import { LoginPage } from "../components/LoginPage";
+import { CertificateModal } from "../components/CertificateModal";
+import { Community } from "../components/Community";
+import { Course, CourseStatus, User, UserStats } from "../../types";
 import { Search, Download, LogOut, Filter } from "lucide-react";
-import { CourseCard } from "./components/CourseCard";
+import { CourseCard } from "../components/CourseCard";
 
-import { clearAuth, getAccessToken, getStoredUser, setAccessToken, setStoredUser } from "./utils/auth";
+import { clearAuth, getAccessToken, getStoredUser, setAccessToken, setStoredUser } from "../utils/auth";
 import {
   getDownloadedCourses,
   markDownloaded,
   removeDownloaded,
-} from "./utils/offlineCourses";
-import { registerPushNotifications } from "./utils/pushService";
+} from "../utils/offlineCourses";
+import { registerPushNotifications } from "../utils/pushService";
 
 import { useDashboard } from "@/hooks/useDashboard";
 import { useLibrary } from "@/hooks/useLibrary";
 import { useOfflineStatus } from "@/hooks/useOfflineStatus";
 import { useProgressUpdate } from "@/hooks/useProgressUpdate";
-import { FieldAssessmentPage } from "./components/FieldAssessment";
-import { PWAInstallBanner } from "./components/PWAInstallBanner";
-import { PWAIOSBanner } from "./components/PWAIOSBanner";
+import { FieldAssessmentPage } from "../components/FieldAssessment";
+import { PWAInstallBanner } from "../components/PWAInstallBanner";
+import { PWAIOSBanner } from "../components/PWAIOSBanner";
 import { useLearningPaths } from "@/hooks/useLearningPaths";
 import { mapLearningPath } from "@/mappers/learningPathMapper";
 

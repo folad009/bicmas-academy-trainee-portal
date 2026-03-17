@@ -1,0 +1,122 @@
+const TOKEN_KEY = "access_token";
+const USER_KEY = "auth_user";
+const REFRESH_TOKEN_KEY = "refresh_token";
+
+export type AuthUser = {
+  id: string;
+  name: string;
+  email: string;
+  role: "Trainee";
+  avatar: string;
+};
+
+type StoredAuth = {
+  accessToken: string;
+  refreshToken?: string | null;
+  user: AuthUser;
+};
+
+const getStorage = () => {
+  if (typeof window === "undefined") return null;
+
+  try {
+    return window.localStorage;
+  } catch {
+    return null;
+  }
+};
+
+const readItem = (key: string) => getStorage()?.getItem(key) ?? null;
+
+const writeItem = (key: string, value: string) => {
+  const storage = getStorage();
+  if (!storage) return false;
+
+  try {
+    storage.setItem(key, value);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+const removeItem = (key: string) => {
+  const storage = getStorage();
+  if (!storage) return false;
+
+  try {
+    storage.removeItem(key);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+const isAuthUser = (value: unknown): value is AuthUser => {
+  if (!value || typeof value !== "object") return false;
+
+  const candidate = value as Record<string, unknown>;
+
+  return (
+    typeof candidate.id === "string" &&
+    typeof candidate.name === "string" &&
+    typeof candidate.email === "string" &&
+    candidate.role === "Trainee" &&
+    typeof candidate.avatar === "string"
+  );
+};
+
+export const getAccessToken = () => readItem(TOKEN_KEY);
+
+export const getRefreshToken = () => readItem(REFRESH_TOKEN_KEY);
+
+export const setAccessToken = (token: string) => writeItem(TOKEN_KEY, token);
+
+export const setRefreshToken = (token: string | null) => {
+  if (!token) {
+    return removeItem(REFRESH_TOKEN_KEY);
+  }
+
+  return writeItem(REFRESH_TOKEN_KEY, token);
+};
+
+export const getStoredUser = (): AuthUser | null => {
+  const raw = readItem(USER_KEY);
+  if (!raw) return null;
+
+  try {
+    const parsed: unknown = JSON.parse(raw);
+
+    if (!isAuthUser(parsed)) {
+      removeItem(USER_KEY);
+      return null;
+    }
+
+    return parsed;
+  } catch (error) {
+    console.error("Failed to parse stored user data:", error);
+    removeItem(USER_KEY);
+    return null;
+  }
+};
+
+export const setStoredUser = (user: AuthUser) =>
+  writeItem(USER_KEY, JSON.stringify(user));
+
+export const clearAuth = () => {
+  removeItem(TOKEN_KEY);
+  removeItem(REFRESH_TOKEN_KEY);
+  removeItem(USER_KEY);
+};
+
+export const saveAuth = ({
+  accessToken,
+  refreshToken,
+  user,
+}: StoredAuth) => {
+  const accessSaved = setAccessToken(accessToken);
+  const refreshSaved = setRefreshToken(refreshToken ?? null);
+  const userSaved = setStoredUser(user);
+
+  return accessSaved && refreshSaved && userSaved;
+};

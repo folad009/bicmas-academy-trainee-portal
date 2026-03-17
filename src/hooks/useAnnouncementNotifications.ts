@@ -4,10 +4,12 @@ import {
   showAnnouncementNotification,
 } from "../services/announcementService";
 
-export const useAnnouncementNotifications = () => {
+export const useAnnouncementNotifications = (enabled: boolean) => {
   const lastAnnouncementId = useRef<string | null>(null);
 
   useEffect(() => {
+    if (!enabled) return;
+
     const checkAnnouncements = async () => {
       try {
         const announcements = await getAnnouncements();
@@ -31,5 +33,5 @@ export const useAnnouncementNotifications = () => {
     const interval = setInterval(checkAnnouncements, 60000);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [enabled]);
 };

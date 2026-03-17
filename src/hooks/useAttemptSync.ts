@@ -18,7 +18,7 @@ export const useAttemptSync = () => {
     const status = data.status;
 
     // Update dashboard cache immediately (single source of truth)
-    queryClient.setQueryData(["dashboard"], (old: any) => {
+    queryClient.setQueriesData({ queryKey: ["dashboard"] }, (old: any) => {
       if (!old?.courses) return old;
 
       return {

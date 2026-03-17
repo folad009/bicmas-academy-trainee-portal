@@ -24,6 +24,14 @@ export const ScormPlayer: React.FC<ScormPlayerProps> = ({
   onUpdateProgress,
   onViewCertificate,
 }) => {
+  const resolvedScormPackageId =
+    course.scormPackageId ??
+    course.modules
+      ?.flatMap((module: any) => module.lessons ?? [])
+      ?.find((lesson: any) => lesson.scormPackageId)
+      ?.scormPackageId ??
+    null;
+
   // ----------------------------
   // UI state
   // ----------------------------
@@ -113,7 +121,7 @@ export const ScormPlayer: React.FC<ScormPlayerProps> = ({
   // ----------------------------
   useEffect(() => {
     const load = async () => {
-      if (!course.scormPackageId) {
+      if (!resolvedScormPackageId) {
         setError("No SCORM package configured for this course.");
         setLoading(false);
         return;
@@ -129,7 +137,7 @@ export const ScormPlayer: React.FC<ScormPlayerProps> = ({
         lastReportedProgress.current = 0;
         lastSavedProgress.current = 0;
 
-        const res = await fetchScormLaunchUrl(course.scormPackageId);
+        const res = await fetchScormLaunchUrl(resolvedScormPackageId);
 
         setLaunchUrl(res.launchUrl);
         setScormAttemptId(res.scormAttemptId);
@@ -141,7 +149,7 @@ export const ScormPlayer: React.FC<ScormPlayerProps> = ({
     };
 
     load();
-  }, [course.id]);
+  }, [course.id, resolvedScormPackageId]);
 
   // ----------------------------
   // SCORM message listener

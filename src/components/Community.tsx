@@ -156,7 +156,7 @@ export const Community: React.FC<CommunityProps> = ({ user }) => {
              <div className="space-y-6 pl-16">
                 {[1, 2].map(i => (
                   <div key={i} className="flex gap-3">
-                     <div className="w-8 h-8 rounded-full bg-slate-200 flex-shrink-0"></div>
+                     <div className="w-8 h-8 rounded-full bg-slate-200 shrink-0"></div>
                      <div className="bg-slate-50 p-3 rounded-xl rounded-tl-none">
                         <div className="flex items-center gap-2 mb-1">
                           <span className="font-medium text-sm text-slate-900">John Doe</span>
@@ -271,7 +271,7 @@ export const Community: React.FC<CommunityProps> = ({ user }) => {
     };
 
     return (
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm h-[600px] flex overflow-hidden animate-in fade-in zoom-in duration-300">
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm h-150 flex overflow-hidden animate-in fade-in zoom-in duration-300">
          {/* Contacts List */}
          <div className={`w-full md:w-80 border-r border-slate-100 flex flex-col ${activeContactId ? 'hidden md:flex' : 'flex'}`}>
             <div className="p-4 border-b border-slate-100 bg-slate-50/50">
@@ -296,7 +296,7 @@ export const Community: React.FC<CommunityProps> = ({ user }) => {
                     <div className="flex-1 text-left min-w-0">
                        <div className="flex justify-between items-baseline mb-0.5">
                           <span className={`text-sm font-semibold truncate ${activeContactId === contact.id ? 'text-blue-900' : 'text-slate-900'}`}>{contact.name}</span>
-                          <span className="text-[10px] text-slate-400 flex-shrink-0">{contact.lastMessageTime}</span>
+                          <span className="text-[10px] text-slate-400 shrink-0">{contact.lastMessageTime}</span>
                        </div>
                        <p className={`text-xs truncate ${contact.unread > 0 ? 'font-bold text-slate-800' : 'text-slate-500'}`}>
                          {contact.lastMessage}
@@ -467,7 +467,7 @@ export const Community: React.FC<CommunityProps> = ({ user }) => {
                       value={newTopicContent}
                       onChange={(e) => setNewTopicContent(e.target.value)}
                       placeholder="Share your thoughts, questions, or insights..."
-                      className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all min-h-[120px]"
+                      className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all min-h-30"
                       required
                     />
                  </div>

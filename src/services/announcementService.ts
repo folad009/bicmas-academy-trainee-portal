@@ -39,13 +39,7 @@ export const getAnnouncements = async () => {
 export const showAnnouncementNotification = async (message: string) => {
   if (!("Notification" in window)) return;
 
-  let permission = Notification.permission;
-
-  if (permission === "default") {
-    permission = await Notification.requestPermission();
-  }
-
-  if (permission !== "granted") return;
+  if (Notification.permission !== "granted") return;
 
   try {
     if (

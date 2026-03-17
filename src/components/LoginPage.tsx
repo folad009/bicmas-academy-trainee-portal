@@ -31,7 +31,17 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
           ? await loginWithEmail(email, password)
           : await loginWithPhone(phoneNumber, password);
 
-      saveAuth(data.accessToken, data.refreshToken, data.user);
+      saveAuth({
+        accessToken: data.accessToken,
+        refreshToken: data.refreshToken,
+        user: {
+          id: data.user.id,
+          name: data.user.email.split("@")[0],
+          email: data.user.email,
+          role: "Trainee",
+          avatar: "https://picsum.photos/200",
+        },
+      });
       onLogin({
         accessToken: data.accessToken,
         user: data.user,

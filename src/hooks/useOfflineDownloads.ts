@@ -1,32 +1,15 @@
 import { useEffect } from "react";
-
-const QUEUE_KEY = "pendingDownloads";
-
-const getQueue = (): string[] => {
-  try {
-    return JSON.parse(localStorage.getItem(QUEUE_KEY) || "[]");
-  } catch {
-    return [];
-  }
-};
-
-const saveQueue = (queue: string[]) => {
-  localStorage.setItem(QUEUE_KEY, JSON.stringify(queue));
-};
+import {
+  addToQueue,
+  getDownloadQueue,
+  saveDownloadQueue,
+} from "@/utils/offlineCourses";
 
 export const useOfflineDownloads = (
   downloadCourseAssets: (courseId: string) => Promise<void>
 ) => {
-  const addToQueue = (courseId: string) => {
-    const queue = getQueue();
-    if (!queue.includes(courseId)) {
-      queue.push(courseId);
-      saveQueue(queue);
-    }
-  };
-
   const processQueue = async () => {
-    const queue = getQueue();
+    const queue = getDownloadQueue();
     if (!queue.length) return;
 
     const remaining: string[] = [];
@@ -39,7 +22,7 @@ export const useOfflineDownloads = (
       }
     }
 
-    saveQueue(remaining);
+    saveDownloadQueue(remaining);
   };
 
   useEffect(() => {

@@ -55,9 +55,10 @@ export interface RawScormScore {
 /**
  * Fetch dashboard and map backend → UI-friendly shape
  */
-export async function fetchLearnerDashboard(): Promise<LearnerDashboardViewModel> {
-  const token = getAccessToken();
-
+export async function fetchLearnerDashboard(
+  token: string
+): Promise<LearnerDashboardViewModel> {
+  
   const [dashboardRes, scormRes] = await Promise.all([
     fetch(
       "https://bicmas-academy-main-backend-production.up.railway.app/api/v1/dashboard/learner",
@@ -244,6 +245,12 @@ export async function fetchLearnerDashboard(): Promise<LearnerDashboardViewModel
 
 
 
+
+
+
+
+
+
 /**
  * Sync SCORM progress, then reload dashboard
  */
@@ -267,5 +274,5 @@ export async function syncProgressAndRefresh(
   }
 
   // After sync, refetch dashboard so aggregates update
-  return fetchLearnerDashboard();
+  return fetchLearnerDashboard(token!);
 }

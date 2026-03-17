@@ -1,9 +1,8 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import { QueryClientProvider } from "@tanstack/react-query";
 
-import App from "./App";
-import { queryClient } from "./state/queryClient";
+import App from "./src/app/App";
+
 
 const rootElement = document.getElementById("root");
 
@@ -15,14 +14,34 @@ const root = ReactDOM.createRoot(rootElement);
 
 root.render(
   <React.StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <App />
-    </QueryClientProvider>
+    <App />
   </React.StrictMode>
 );
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
+    if (import.meta.env.DEV) {
+      navigator.serviceWorker.getRegistrations().then((registrations) => {
+        registrations.forEach((registration) => {
+          registration.unregister().catch((error) => {
+            console.error("Service Worker unregister failed:", error);
+          });
+        });
+      });
+
+      if ("caches" in window) {
+        caches.keys().then((keys) => {
+          keys.forEach((key) => {
+            caches.delete(key).catch((error) => {
+              console.error("Cache delete failed:", error);
+            });
+          });
+        });
+      }
+
+      return;
+    }
+
     navigator.serviceWorker
       .register("/service-worker.js")
       .then((registration) => {

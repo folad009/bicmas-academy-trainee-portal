@@ -33,7 +33,7 @@ export const useProgressUpdate = () => {
     progress: number,
     completedModules: number
   ) => {
-    queryClient.setQueryData(["dashboard"], (old: any) => {
+    queryClient.setQueriesData({ queryKey: ["dashboard"] }, (old: any) => {
       if (!old) return old;
 
       return {
