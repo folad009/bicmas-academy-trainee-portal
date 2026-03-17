@@ -58,7 +58,10 @@ export interface RawScormScore {
 export async function fetchLearnerDashboard(
   token: string
 ): Promise<LearnerDashboardViewModel> {
-  
+  if (!token) {
+    throw new Error("No access token provided");
+  }
+
   const [dashboardRes, scormRes] = await Promise.all([
     fetch(
       "https://bicmas-academy-main-backend-production.up.railway.app/api/v1/dashboard/learner",
@@ -258,6 +261,9 @@ export async function syncProgressAndRefresh(
   attemptId: string,
 ): Promise<LearnerDashboardViewModel> {
   const token = getAccessToken();
+  if (!token) {
+    throw new Error("No access token");
+  }
 
   const res = await fetch(
     `https://bicmas-academy-main-backend-production.up.railway.app/api/v1/attempts/${attemptId}/sync-progress`,
@@ -274,5 +280,5 @@ export async function syncProgressAndRefresh(
   }
 
   // After sync, refetch dashboard so aggregates update
-  return fetchLearnerDashboard(token!);
+  return fetchLearnerDashboard(token);
 }

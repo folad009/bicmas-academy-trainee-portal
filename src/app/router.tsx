@@ -9,6 +9,7 @@ import AssessmentPage from "@/pages/AssessmentPage";
 import CertificatesPage from "@/pages/CertificatesPage";
 import PlayerPage from "@/player/PlayerPage";
 import LoginRoutePage from "@/pages/LoginRoutePage";
+import NotFoundPage from "@/pages/NotFoundPage";
 
 export default function Router() {
   return (
@@ -23,6 +24,7 @@ export default function Router() {
           <Route path="/assessment" element={<AssessmentPage />} />
           <Route path="/certificates" element={<CertificatesPage />} />
           <Route path="/profile" element={<ProfilePage />} />
+          <Route path="*" element={<NotFoundPage />} />
         </Route>
         <Route path="/course/:id" element={<PlayerPage />} />
       </Routes>

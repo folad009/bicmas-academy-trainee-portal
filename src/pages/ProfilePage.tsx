@@ -1,8 +1,13 @@
 import { useAuth } from "@/context/AuthContext";
+import { Navigate } from "react-router-dom";
 import { LogOut } from "lucide-react";
 
 export default function ProfilePage() {
   const { user, logout } = useAuth();
+
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">

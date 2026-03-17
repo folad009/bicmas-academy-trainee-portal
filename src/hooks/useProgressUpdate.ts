@@ -47,7 +47,8 @@ export const useProgressUpdate = () => {
       };
     });
 
-    if (progress === 100) {
+    const safeProgress = normalizeProgress(progress);
+    if (safeProgress === 100) {
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
     }
   };

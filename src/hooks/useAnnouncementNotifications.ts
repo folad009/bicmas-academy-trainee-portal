@@ -20,9 +20,13 @@ export const useAnnouncementNotifications = (enabled: boolean) => {
 
         if (lastAnnouncementId.current === latest.id) return;
 
-        lastAnnouncementId.current = latest.id;
-
-        await showAnnouncementNotification(latest.text);
+        try {
+          await showAnnouncementNotification(latest.text);
+          lastAnnouncementId.current = latest.id;
+        } catch (err) {
+          console.error("Failed to show announcement notification", err);
+          // Do not advance the lastAnnouncementId so we can retry later
+        }
       } catch (err) {
         console.error("Announcement polling failed:", err);
       }

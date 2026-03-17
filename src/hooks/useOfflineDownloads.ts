@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import {
   addToQueue,
   getDownloadQueue,
@@ -8,21 +8,35 @@ import {
 export const useOfflineDownloads = (
   downloadCourseAssets: (courseId: string) => Promise<void>
 ) => {
+  const downloadCourseAssetsRef = useRef(downloadCourseAssets);
+  const isProcessingRef = useRef(false);
+
+  useEffect(() => {
+    downloadCourseAssetsRef.current = downloadCourseAssets;
+  }, [downloadCourseAssets]);
+
   const processQueue = async () => {
-    const queue = getDownloadQueue();
-    if (!queue.length) return;
+    if (isProcessingRef.current) return;
+    isProcessingRef.current = true;
 
-    const remaining: string[] = [];
+    try {
+      const queue = getDownloadQueue();
+      if (!queue.length) return;
 
-    for (const courseId of queue) {
-      try {
-        await downloadCourseAssets(courseId);
-      } catch {
-        remaining.push(courseId);
+      const remaining: string[] = [];
+
+      for (const courseId of queue) {
+        try {
+          await downloadCourseAssetsRef.current(courseId);
+        } catch {
+          remaining.push(courseId);
+        }
       }
-    }
 
-    saveDownloadQueue(remaining);
+      saveDownloadQueue(remaining);
+    } finally {
+      isProcessingRef.current = false;
+    }
   };
 
   useEffect(() => {
@@ -42,7 +56,7 @@ export const useOfflineDownloads = (
       return { queued: true };
     }
 
-    await downloadCourseAssets(courseId);
+    await downloadCourseAssetsRef.current(courseId);
     return { queued: false };
   };
 

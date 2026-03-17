@@ -10,6 +10,17 @@ export async function registerDevice() {
     throw new Error('No access token available');
   }
 
+  const uaData = (navigator as any).userAgentData;
+  const userAgent = navigator.userAgent;
+  const platform = uaData?.platform || navigator.platform || 'Unknown Device';
+  const isMobile =
+    typeof uaData?.mobile === 'boolean'
+      ? uaData.mobile
+      : /Mobi|Android|iPhone|iPad|Tablet/i.test(userAgent);
+
+  const deviceType = isMobile ? 'MOBILE' : 'DESKTOP';
+  const deviceName = platform;
+
   const response = await fetch(`${BASE_URL}/auth/device/register`, {
     method: 'POST',
     headers: {
@@ -17,17 +28,34 @@ export async function registerDevice() {
       Authorization: `Bearer ${token}`,
     },
     body: JSON.stringify({
-      deviceType: 'DESKTOP',
-      deviceName: navigator.platform || 'Unknown Device',
-      userAgent: navigator.userAgent,
+      deviceType,
+      deviceName,
+      userAgent,
     }),
   });
 
   const text = await response.text();
-  const data = text ? JSON.parse(text) : null;
+  let data: any = null;
+  let parseError: Error | null = null;
+
+  try {
+    data = text ? JSON.parse(text) : null;
+  } catch (err) {
+    parseError = err instanceof Error ? err : new Error(String(err));
+  }
 
   if (!response.ok) {
-    throw new Error(data?.error || 'Failed to register device');
+    const responseDetails = parseError
+      ? `Invalid JSON response: ${parseError.message}`
+      : text;
+    throw new Error(
+      data?.error ||
+        `Failed to register device (status ${response.status}): ${responseDetails}`,
+    );
+  }
+
+  if (parseError) {
+    throw new Error(`Failed to parse device registration response: ${parseError.message}`);
   }
 
   return data;

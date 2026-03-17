@@ -5,7 +5,18 @@ import { fetchScormLaunchUrl } from "@/api/scorm";
 import { useAttemptSync } from "@/hooks/useAttemptSync";
 
 const BASE_URL =
-  "https://bicmas-academy-main-backend-production.up.railway.app/api/v1";
+  "https://bicmas-academy-main-backend-production.up.railway.app/api/v1"
+
+if (!BASE_URL) {
+  throw new Error(
+    "Missing NEXT_PUBLIC_API_BASE_URL environment variable. Please set it before running the app.",
+  );
+}
+
+const ALLOWED_SCORM_ORIGINS = [
+  "https://cloud.scorm.com",
+  "https://engine.scorm.com",
+];
 
 interface ScormPlayerProps {
   course: Course;
@@ -156,8 +167,8 @@ export const ScormPlayer: React.FC<ScormPlayerProps> = ({
   // ----------------------------
   useEffect(() => {
     const handler = async (event: MessageEvent) => {
-      // Allow any scorm.com domain (cloud, engine, etc.)
-      if (!event.origin.includes("scorm.com")) return;
+      // Allow only approved SCORM Cloud origins to prevent host-based spoofing
+      if (!ALLOWED_SCORM_ORIGINS.includes(event.origin)) return;
       if (!event.data) return;
       if (!scormAttemptIdRef.current) return;
 
@@ -222,12 +233,15 @@ export const ScormPlayer: React.FC<ScormPlayerProps> = ({
 
       const pct = lastReportedProgress.current;
 
+      const payload = JSON.stringify({
+        completionPercentage: pct,
+        status: pct >= 100 ? "COMPLETED" : "IN_PROGRESS",
+      });
+      const blob = new Blob([payload], { type: "application/json" });
+
       navigator.sendBeacon(
         `${BASE_URL}/attempts/${scormAttemptIdRef.current}`,
-        JSON.stringify({
-          completionPercentage: pct,
-          status: pct >= 100 ? "COMPLETED" : "IN_PROGRESS",
-        })
+        blob,
       );
     };
 

@@ -1,7 +1,14 @@
 import { getAccessToken } from "@/utils/auth";
 
+// Use environment configuration to allow local/dev/staging to override the backend URL
 const BASE_URL =
-  "https://bicmas-academy-main-backend-production.up.railway.app";
+ "https://bicmas-academy-main-backend-production.up.railway.app/api/v1"
+
+if (!BASE_URL) {
+  throw new Error(
+    "Missing NEXT_PUBLIC_API_BASE_URL environment variable. Please set it before running the app.",
+  );
+}
 
 export async function fetchAssignedCourses() {
   const token = getAccessToken();
@@ -11,7 +18,7 @@ export async function fetchAssignedCourses() {
   }
 
   const res = await fetch(
-    `${BASE_URL}/api/v1/assignments/assigned-courses`,
+    `${BASE_URL}/assignments/assigned-courses`,
     {
       headers: {
         Authorization: `Bearer ${token}`,

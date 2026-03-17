@@ -2,15 +2,11 @@ import React, { useState, useEffect } from "react";
 import { X } from "lucide-react";
 import { fieldTask } from "../api/fieldTask";
 
-type Props = {
-  userId: string;
-};
-
 type MediaType = "image" | "video" | null;
 
 const MAX_IMAGES = 4;
 
-export const FieldAssessmentPage: React.FC<Props> = ({ userId }) => {
+export const FieldAssessmentPage: React.FC = () => {
   const [mediaType, setMediaType] = useState<MediaType>(null);
   const [files, setFiles] = useState<File[]>([]);
   const [urls, setUrls] = useState<string[]>([]);
@@ -80,8 +76,23 @@ export const FieldAssessmentPage: React.FC<Props> = ({ userId }) => {
 
     try {
       /* Upload each file individually (API expects one file) */
-      for (const file of files) {
-        await fieldTask(moduleTopic, note, file);
+      const uploadResults = await Promise.allSettled(
+        files.map((file) => fieldTask(moduleTopic, note, file)),
+      );
+
+      const failed = uploadResults.filter(
+        (result) => result.status === "rejected",
+      ) as PromiseRejectedResult[];
+
+      if (failed.length) {
+        const messages = failed
+          .map((f) => (f.reason instanceof Error ? f.reason.message : String(f.reason)))
+          .filter(Boolean);
+        const message = `Some uploads failed (${failed.length}): ${messages.join(", ")}`;
+        setError(message);
+        console.error("Assessment submission failed:", message);
+        alert(message);
+        return;
       }
 
       alert("Assessment submitted successfully!");
@@ -143,6 +154,7 @@ export const FieldAssessmentPage: React.FC<Props> = ({ userId }) => {
               <div key={i} className="relative">
                 <img
                   src={url}
+                  alt={`Field image ${i + 1}`}
                   className="w-24 h-24 object-cover rounded-lg border"
                 />
                 <button

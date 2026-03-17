@@ -47,7 +47,7 @@ export function mapAssignedCourse(assignment: any): Course {
     modules: modules.map((m: any) => ({
       id: m.id,
       title: m.name,
-      lessons: m.lessons.map((l: any) => ({
+      lessons: (m.lessons ?? []).map((l: any) => ({
         id: l.id,
         title: l.title,
         scormPackageId: l.scormPackageId,

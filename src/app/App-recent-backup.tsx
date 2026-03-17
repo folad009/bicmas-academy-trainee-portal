@@ -51,6 +51,7 @@ const DEFAULT_STATS: UserStats = {
 export default function App() {
   // ---------------- Auth ----------------
   const [user, setUser] = useState<User | null>(() => getStoredUser())
+  const [downloadedIds, setDownloadedIds] = useState<string[]>(() => getDownloadedCourses());
   const isAuthenticated = !!getAccessToken() && !!user
 
   // ---------------- UI State ----------------
@@ -79,13 +80,11 @@ export default function App() {
 
   // ---------------- Derived Data ----------------
   const libraryCourses = useMemo(() => {
-    const downloadedIds = getDownloadedCourses();
-
     return libraryCoursesRaw.map((course) => ({
       ...course,
       isDownloaded: downloadedIds.includes(course.id),
     }));
-  }, [libraryCoursesRaw]);
+  }, [libraryCoursesRaw, downloadedIds]);
 
   const currentLearningPath = useMemo(() => {
     if (!learningPaths || learningPaths.length === 0) return null;
@@ -129,21 +128,33 @@ export default function App() {
 
   // ---------------- Auth Handlers ----------------
   const handleLogin = (data: {
-    accessToken: string,
-    user: {id: string; email: string; role: string; }
+    accessToken: string;
+    user: { id?: string; email?: string; role?: string; name?: string };
   }) => {
+    const email = data.user?.email;
+    const id = data.user?.id;
+
+    const name =
+      email?.split("@")[0] ?? data.user?.name ?? "User";
+
+    const role = data.user?.role ?? "Trainee";
+
+    const avatarSeed = email || id || name;
+    const avatar = `https://api.dicebear.com/6.x/identicon/svg?seed=${encodeURIComponent(
+      avatarSeed,
+    )}`;
+
     const formattedUser: User = {
-      id: data.user.id,
-      name: data.user.email?.split("@")[0] ?? "User",
-      email: data.user.email,
-      role: "Trainee",
-      avatar: "https://picsum.photos/200",
+      id: id ?? "",
+      name,
+      email: email ?? null,
+      role,
+      avatar,
     };
 
     setAccessToken(data.accessToken);
     setStoredUser(formattedUser);
     setUser(formattedUser);
-    
   };
 
   const handleLogout = () => {
@@ -168,18 +179,32 @@ export default function App() {
 
   // Offline downloads (local only)
   const handleDownload = async (courseId: string) => {
-    await new Promise((res) => setTimeout(res, 400));
-    markDownloaded(courseId);
+    try {
+      await new Promise((res) => setTimeout(res, 400));
+      markDownloaded(courseId);
+      setDownloadedIds((prev) => Array.from(new Set([...prev, courseId])));
+    } catch (err) {
+      console.error("Failed to mark course as downloaded", err);
+    }
   };
 
   const handleRemoveDownload = (courseId: string) => {
     removeDownloaded(courseId);
+    setDownloadedIds((prev) => prev.filter((id) => id !== courseId));
   };
 
   useEffect(() => {
     if (!isAuthenticated) return;
 
-    registerPushNotifications();
+    const register = async () => {
+      try {
+        await registerPushNotifications();
+      } catch (error) {
+        console.error("Failed to register push notifications", error);
+      }
+    };
+
+    register();
   }, [isAuthenticated]);
 
   // ---------------- Views ----------------
@@ -376,7 +401,7 @@ export default function App() {
 
         {activeView === "library" && renderLibrary()}
         {activeView === "assessment" && (
-          <FieldAssessmentPage userId={user.id} />
+          <FieldAssessmentPage />
         )}
         {activeView === "community" && <Community user={user} />}
         {activeView === "profile" && renderProfile()}

@@ -109,17 +109,11 @@ certificateUrl
   ) => {
     const { maxWidth, initialFontSize, minFontSize, fontName, fontStyle, color } = options;
    let fontSize = initialFontSize;
+
+    doc.setFont(fontName, fontStyle);
+    doc.setFontSize(fontSize);
+
     let lines = doc.splitTextToSize(text, maxWidth) as string[];
-
-    doc.setFont(fontName, fontStyle);
-
-    while (fontSize > minFontSize && lines.length > 2) {
-      fontSize -= 2;
-      doc.setFontSize(fontSize);
-      lines = doc.splitTextToSize(text, maxWidth) as string[];
-    }
-
-    doc.setFont(fontName, fontStyle);
     doc.setFontSize(fontSize);
     doc.setTextColor(...color);
     doc.text(lines, doc.internal.pageSize.getWidth() / 2, y, {

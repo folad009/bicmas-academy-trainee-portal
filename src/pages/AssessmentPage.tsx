@@ -6,5 +6,5 @@ export default function AssessmentPage() {
 
   if (!user) return null;
 
-  return <FieldAssessmentPage userId={user.id} />;
+  return <FieldAssessmentPage />;
 }

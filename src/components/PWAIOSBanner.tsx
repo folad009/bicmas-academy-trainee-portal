@@ -6,7 +6,13 @@ export function PWAIOSBanner() {
 
   useEffect(() => {
     if (isIOS() && !isStandalone()) {
-      const dismissed = localStorage.getItem("ios-install-dismissed");
+      let dismissed: string | null = null;
+      try {
+        dismissed = localStorage.getItem("ios-install-dismissed");
+      } catch (error) {
+        // Ignore storage errors (e.g., private browsing)
+      }
+
       if (!dismissed) {
         setShow(true);
       }
@@ -25,8 +31,13 @@ export function PWAIOSBanner() {
       <button
         className="mt-2 text-xs underline"
         onClick={() => {
-          localStorage.setItem("ios-install-dismissed", "true");
-          setShow(false);
+          try {
+            localStorage.setItem("ios-install-dismissed", "true");
+          } catch (error) {
+            // Ignore storage errors
+          } finally {
+            setShow(false);
+          }
         }}
       >
         Dismiss

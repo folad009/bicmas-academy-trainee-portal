@@ -10,9 +10,12 @@ export default function PlayerPage() {
   const updateProgress = useProgressUpdate();
   const { data: dashboardData, isLoading: isDashboardLoading, isError } = useDashboard();
   const dashboardCourses = dashboardData?.courses ?? [];
-  const { data: libraryCourses = [], isLoading: isLibraryLoading } = useLibrary(
-    dashboardCourses,
-  );
+  const {
+    data: libraryCourses = [],
+    isLoading: isLibraryLoading,
+    isError: isLibraryError,
+    error: libraryError,
+  } = useLibrary(dashboardCourses);
 
   const course =
     libraryCourses.find((candidate) => candidate.id === id) ??
@@ -26,6 +29,14 @@ export default function PlayerPage() {
     return (
       <div className="p-10 text-center text-slate-500">
         We could not load this course right now.
+      </div>
+    );
+  }
+
+  if (isLibraryError) {
+    return (
+      <div className="p-10 text-center text-slate-500">
+        Failed to load course library: {String(libraryError)}
       </div>
     );
   }

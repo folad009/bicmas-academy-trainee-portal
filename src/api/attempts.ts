@@ -15,6 +15,9 @@ interface SyncAttemptPayload {
  */
 const authFetch = async (url: string, options: RequestInit = {}) => {
   const token = getAccessToken();
+  if (!token) {
+    throw new Error("No access token");
+  }
 
   // Properly merge headers without unsafe casting
   const headers = new Headers(options.headers);
@@ -121,6 +124,20 @@ export const syncCourseAttempt = async (attemptId: string) => {
     throw new Error("Missing attemptId in sync response - cannot proceed");
   }
 
+  const isAttemptStatus = (value: any): value is AttemptStatus =>
+    value === "IN_PROGRESS" || value === "COMPLETED";
+
+  const rawStatus = res.data.status;
+  const status: AttemptStatus = isAttemptStatus(rawStatus)
+    ? rawStatus
+    : "IN_PROGRESS";
+
+  if (!isAttemptStatus(rawStatus)) {
+    console.warn(
+      `[SCORM SYNC] Unexpected status value from backend: ${rawStatus}. Defaulting to IN_PROGRESS.`,
+    );
+  }
+
   const normalized = {
     // Backend authoritative identity
     attemptId: computedAttemptId,
@@ -129,7 +146,7 @@ export const syncCourseAttempt = async (attemptId: string) => {
     scormPackageId: res.data.scormPackageId,
 
     completionPercentage: res.data.completionPercentage ?? 0,
-    status: res.data.status as AttemptStatus,
+    status,
   };
 
   return normalized;

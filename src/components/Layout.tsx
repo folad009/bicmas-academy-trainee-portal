@@ -69,6 +69,38 @@ const NAV_ITEMS: NavItemConfig[] = [
   },
 ];
 
+const FALLBACK_AVATAR =
+  "https://ui-avatars.com/api/?name=User&background=0D8ABC&color=fff";
+
+type NavItemProps = {
+  item: NavItemConfig;
+  isActive: boolean;
+  onNavigate: (path: string) => void;
+  mobile?: boolean;
+};
+
+const NavItem: React.FC<NavItemProps> = ({ item, isActive, onNavigate, mobile = false }) => {
+  const Icon = item.icon;
+
+  return (
+    <button
+      type="button"
+      onClick={() => onNavigate(item.path)}
+      className={`flex ${mobile ? "flex-col" : "flex-col"} items-center justify-center p-2 rounded-xl transition-all ${
+        isActive
+          ? "text-[#008080] bg-[#008080]/10"
+          : "text-slate-500 hover:text-slate-900 hover:bg-slate-100"
+      }`}
+      aria-current={isActive ? "page" : undefined}
+    >
+      <Icon size={24} className="mb-1" />
+      <span className="text-[10px] font-medium uppercase tracking-wide">
+        {item.label}
+      </span>
+    </button>
+  );
+};
+
 export const Layout: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -90,35 +122,6 @@ export const Layout: React.FC = () => {
   if (!user) {
     return <Navigate to="/login" replace />;
   }
-
-  const NavItem = ({
-    item,
-    mobile = false,
-  }: {
-    item: NavItemConfig;
-    mobile?: boolean;
-  }) => {
-    const Icon = item.icon;
-    const isActive = activeItem.id === item.id;
-
-    return (
-      <button
-        type="button"
-        onClick={() => navigate(item.path)}
-        className={`flex ${mobile ? "flex-col" : "flex-col"} items-center justify-center p-2 rounded-xl transition-all ${
-          isActive
-            ? "text-[#008080] bg-[#008080]/10"
-            : "text-slate-500 hover:text-slate-900 hover:bg-slate-100"
-        }`}
-        aria-current={isActive ? "page" : undefined}
-      >
-        <Icon size={24} className="mb-1" />
-        <span className="text-[10px] font-medium uppercase tracking-wide">
-          {item.label}
-        </span>
-      </button>
-    );
-  };
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row">
@@ -159,7 +162,11 @@ export const Layout: React.FC = () => {
         <nav className="flex-1 flex flex-col gap-6 w-full px-2">
           {NAV_ITEMS.map((item) => (
             <React.Fragment key={item.id}>
-              <NavItem item={item} />
+              <NavItem
+                item={item}
+                isActive={activeItem.id === item.id}
+                onNavigate={navigate}
+              />
             </React.Fragment>
           ))}
         </nav>
@@ -176,8 +183,14 @@ export const Layout: React.FC = () => {
             {isOffline ? <WifiOff size={20} /> : <Wifi size={20} />}
           </div>
           <img
-            src={user.avatar}
+            src={user.avatar || FALLBACK_AVATAR}
             alt={user.name}
+            onError={(e) => {
+              const target = e.currentTarget as HTMLImageElement;
+              if (target.src !== FALLBACK_AVATAR) {
+                target.src = FALLBACK_AVATAR;
+              }
+            }}
             className="w-10 h-10 rounded-full border-2 border-slate-100"
           />
         </div>
@@ -199,8 +212,14 @@ export const Layout: React.FC = () => {
               {isOffline ? <WifiOff size={18} /> : <Wifi size={18} />}
             </div>
             <img
-              src={user.avatar}
+              src={user.avatar || FALLBACK_AVATAR}
               alt={user.name}
+              onError={(e) => {
+                const target = e.currentTarget as HTMLImageElement;
+                if (target.src !== FALLBACK_AVATAR) {
+                  target.src = FALLBACK_AVATAR;
+                }
+              }}
               className="w-8 h-8 rounded-full bg-slate-200"
             />
           </div>
@@ -226,7 +245,12 @@ export const Layout: React.FC = () => {
       <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 flex justify-around p-2 z-40 pb-safe">
         {NAV_ITEMS.map((item) => (
           <React.Fragment key={item.id}>
-            <NavItem item={item} mobile />
+            <NavItem
+              item={item}
+              isActive={activeItem.id === item.id}
+              onNavigate={navigate}
+              mobile
+            />
           </React.Fragment>
         ))}
       </nav>

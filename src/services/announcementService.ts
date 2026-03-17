@@ -69,12 +69,12 @@ export const showAnnouncementNotification = async (message: string) => {
     }
 
     await registration.showNotification("BICMAS Announcement", {
-    body: message,
-    icon: "/logo.png",
-    badge: "/logo.png",
-    tag: "bicmas-announcement",
-  });
-} catch (error) {
+      body: message,
+      icon: "/logo.png",
+      badge: "/logo.png",
+      tag: "bicmas-announcement",
+    });
+  } catch (error) {
     console.error("Failed to show announcement notification", error);
   }
 };

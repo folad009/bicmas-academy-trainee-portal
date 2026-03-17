@@ -10,7 +10,13 @@ interface ScormLaunchResponse {
 
 
 const BASE_URL =
-  "https://bicmas-academy-main-backend-production.up.railway.app/api/v1";
+  "https://bicmas-academy-main-backend-production.up.railway.app/api/v1"
+
+if (!BASE_URL) {
+  throw new Error(
+    "Missing NEXT_PUBLIC_API_BASE_URL environment variable. Please set it before running the app.",
+  );
+}
 
 /**
  * Fetch raw SCORM manifest from backend
@@ -42,11 +48,20 @@ export const fetchScormManifest = async (
 export const fetchScormLaunchUrl = async (
   scormPackageId: string
 ): Promise<ScormLaunchResponse> => {
+  if (!scormPackageId || !scormPackageId.trim()) {
+    throw new Error("Missing scormPackageId");
+  }
+
+  const token = getAccessToken();
+  if (!token) {
+    throw new Error("No access token");
+  }
+
   const res = await fetch(
-    `${BASE_URL}/scorm-packages/${scormPackageId}/launch`,
+    `${BASE_URL}/scorm-packages/${encodeURIComponent(scormPackageId)}/launch`,
     {
       headers: {
-        Authorization: `Bearer ${getAccessToken()}`,
+        Authorization: `Bearer ${token}`,
       },
     }
   );

@@ -4,6 +4,7 @@ import { useLearningPaths } from "@/hooks/useLearningPaths";
 import { mapLearningPath } from "@/mappers/learningPathMapper";
 import { useDownloadStore } from "@/store/downloadStore";
 import { useAuth } from "@/context/AuthContext";
+import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { UserStats } from "@/types";
 import { Navigate, useNavigate } from "react-router-dom";
 import { useMemo } from "react";
@@ -27,6 +28,8 @@ export default function DashboardPage() {
   const { download, remove } = useDownloadStore();
   const navigate = useNavigate();
   const courses = data?.courses ?? [];
+  const isOnline = useOnlineStatus();
+
   const learningPath = useMemo(() => {
     if (!learningPaths.length) return null;
     return mapLearningPath(learningPaths[0], courses);
@@ -45,7 +48,7 @@ export default function DashboardPage() {
       onStartCourse={(courseId) => navigate(`/course/${courseId}`)}
       onDownload={download}
       onRemoveDownload={remove}
-      isOfflineMode={!navigator.onLine}
+      isOfflineMode={!isOnline}
     />
   );
 }

@@ -271,7 +271,7 @@ export const Community: React.FC<CommunityProps> = ({ user }) => {
     };
 
     return (
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm h-150 flex overflow-hidden animate-in fade-in zoom-in duration-300">
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm h-[600px] flex overflow-hidden animate-in fade-in zoom-in duration-300">
          {/* Contacts List */}
          <div className={`w-full md:w-80 border-r border-slate-100 flex flex-col ${activeContactId ? 'hidden md:flex' : 'flex'}`}>
             <div className="p-4 border-b border-slate-100 bg-slate-50/50">
@@ -467,7 +467,7 @@ export const Community: React.FC<CommunityProps> = ({ user }) => {
                       value={newTopicContent}
                       onChange={(e) => setNewTopicContent(e.target.value)}
                       placeholder="Share your thoughts, questions, or insights..."
-                      className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all min-h-30"
+                      className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all min-h-[120px]"
                       required
                     />
                  </div>

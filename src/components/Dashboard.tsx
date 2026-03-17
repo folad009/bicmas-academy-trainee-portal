@@ -93,7 +93,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
     const fetchAnnouncements = async () => {
       try {
         const token = getAccessToken();
-        console.log("Token:", token);
 
         if (!token) {
           return;
@@ -135,21 +134,29 @@ export const Dashboard: React.FC<DashboardProps> = ({
     setIsEnablingNotifications(true);
     setNotificationStatus("");
 
-    const subscription = await registerPushNotifications();
-    const permission = getNotificationPermission();
+    try {
+      const subscription = await registerPushNotifications();
+      const permission = getNotificationPermission();
 
-    if (subscription) {
-      setNotificationsEnabled(true);
-      setNotificationStatus("Notifications enabled. We'll alert you about new announcements.");
-    } else if (permission === "denied") {
+      if (subscription) {
+        setNotificationsEnabled(true);
+        setNotificationStatus("Notifications enabled. We'll alert you about new announcements.");
+      } else if (permission === "denied") {
+        setNotificationsEnabled(false);
+        setNotificationStatus("Notifications are blocked in your browser settings.");
+      } else {
+        setNotificationsEnabled(false);
+        setNotificationStatus("Notifications were not enabled.");
+      }
+    } catch (error: any) {
+      console.error("Failed to enable notifications", error);
       setNotificationsEnabled(false);
-      setNotificationStatus("Notifications are blocked in your browser settings.");
-    } else {
-      setNotificationsEnabled(false);
-      setNotificationStatus("Notifications were not enabled.");
+      setNotificationStatus(
+        `Failed to enable notifications: ${error?.message || "Unknown error"}`,
+      );
+    } finally {
+      setIsEnablingNotifications(false);
     }
-
-    setIsEnablingNotifications(false);
   };
 
   // --- Widget Components --- //
@@ -508,19 +515,25 @@ export const Dashboard: React.FC<DashboardProps> = ({
   </h3>
 
   <div className="space-y-3 max-h-64 overflow-y-auto">
-    {announcements.map((announcement) => (
-      <div
-        key={announcement.id}
-        className="p-3 bg-slate-50 border border-slate-100 rounded-lg text-sm"
-      >
-        <p className="text-slate-700">{announcement.text}</p>
-
-        <span className="text-xs text-slate-400 block mt-1">
-          {new Date(announcement.createdAt).toLocaleDateString()} •{" "}
-          {announcement.user.fullName}
-        </span>
+    {announcements.length === 0 ? (
+      <div className="py-8 text-center text-sm text-slate-500">
+        No announcements at the moment.
       </div>
-    ))}
+    ) : (
+      announcements.map((announcement) => (
+        <div
+          key={announcement.id}
+          className="p-3 bg-slate-50 border border-slate-100 rounded-lg text-sm"
+        >
+          <p className="text-slate-700">{announcement.text}</p>
+
+          <span className="text-xs text-slate-400 block mt-1">
+            {new Date(announcement.createdAt).toLocaleDateString()} •{" "}
+            {announcement.user.fullName}
+          </span>
+        </div>
+      ))
+    )}
   </div>
 </div>
 

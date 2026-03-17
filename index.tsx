@@ -21,22 +21,32 @@ root.render(
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     if (import.meta.env.DEV) {
-      navigator.serviceWorker.getRegistrations().then((registrations) => {
-        registrations.forEach((registration) => {
-          registration.unregister().catch((error) => {
-            console.error("Service Worker unregister failed:", error);
-          });
-        });
-      });
-
-      if ("caches" in window) {
-        caches.keys().then((keys) => {
-          keys.forEach((key) => {
-            caches.delete(key).catch((error) => {
-              console.error("Cache delete failed:", error);
+      navigator.serviceWorker
+        .getRegistrations()
+        .then((registrations) => {
+          registrations.forEach((registration) => {
+            registration.unregister().catch((error) => {
+              console.error("Service Worker unregister failed:", error);
             });
           });
+        })
+        .catch((error) => {
+          console.error("Service Worker registrations retrieval failed:", error);
         });
+
+      if ("caches" in window) {
+        caches
+          .keys()
+          .then((keys) => {
+            keys.forEach((key) => {
+              caches.delete(key).catch((error) => {
+                console.error("Cache delete failed:", error);
+              });
+            });
+          })
+          .catch((error) => {
+            console.error("Caches keys retrieval failed:", error);
+          });
       }
 
       return;

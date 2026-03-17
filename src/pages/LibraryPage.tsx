@@ -83,6 +83,7 @@ export default function LibraryPage() {
           <input
             type="text"
             placeholder="Search courses..."
+            aria-label="Search courses"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full pl-10 pr-4 py-2 rounded-xl border"
@@ -94,6 +95,7 @@ export default function LibraryPage() {
             <button
               key={f.value}
               onClick={() => setFilter(f.value as LibraryFilter)}
+              aria-pressed={filter === f.value}
               className={`px-4 py-2 rounded-full text-sm ${
                 filter === f.value
                   ? "bg-slate-900 text-white"

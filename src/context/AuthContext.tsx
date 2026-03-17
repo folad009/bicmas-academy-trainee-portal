@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect } from "react";
+import { createContext, useContext, useState } from "react";
 import {
   getAccessToken,
   clearAuth,
@@ -21,12 +21,26 @@ export const AuthProvider = ({ children }: any) => {
   const [token, setToken] = useState<string | null>(getAccessToken());
 
   const login = (data: any) => {
+    if (!data || !data.user) {
+      throw new Error("Invalid login response: missing user data");
+    }
+
+    const userData = data.user;
+    const email = userData?.email;
+    const name = email?.split("@")[0] ?? userData?.name ?? "User";
+    const role = userData?.role ?? "Trainee";
+
+    const avatarSeed = email ?? userData?.id ?? name;
+    const avatar = `https://api.dicebear.com/6.x/identicon/svg?seed=${encodeURIComponent(
+      avatarSeed,
+    )}`;
+
     const formattedUser: AuthUser = {
-      id: data.user.id,
-      name: data.user.email.split("@")[0],
-      email: data.user.email,
-      role: "Trainee",
-      avatar: "https://picsum.photos/200",
+      id: userData?.id ?? "",
+      name,
+      email: email ?? null,
+      role,
+      avatar,
     };
 
     saveAuth({
@@ -52,4 +66,10 @@ export const AuthProvider = ({ children }: any) => {
   );
 };
 
-export const useAuth = () => useContext(AuthContext)!;
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error("useAuth must be used within an AuthProvider");
+  }
+  return context;
+};
