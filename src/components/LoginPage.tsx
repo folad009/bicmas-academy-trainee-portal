@@ -31,15 +31,24 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
           ? await loginWithEmail(email, password)
           : await loginWithPhone(phoneNumber, password);
 
+      const email = data.user?.email;
+      const name =
+        email?.split("@")[0] ?? data.user?.phone ?? data.user?.name ?? "User";
+      const role = data.user?.role ?? "Trainee";
+      const avatarSeed = email ?? data.user?.id ?? name;
+      const avatar = `https://api.dicebear.com/6.x/identicon/svg?seed=${encodeURIComponent(
+        avatarSeed,
+      )}`;
+
       saveAuth({
         accessToken: data.accessToken,
         refreshToken: data.refreshToken,
         user: {
-          id: data.user.id,
-          name: data.user.email.split("@")[0],
-          email: data.user.email,
-          role: "Trainee",
-          avatar: "https://picsum.photos/200",
+          id: data.user?.id ?? "",
+          name,
+          email: email ?? null,
+          role,
+          avatar,
         },
       });
       onLogin({
