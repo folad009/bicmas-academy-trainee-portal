@@ -103,7 +103,14 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
             </button>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-5">
+          <form
+            id="bicmas-login-form"
+            name="login"
+            method="post"
+            autoComplete="on"
+            className="space-y-5"
+            onSubmit={handleSubmit}
+          >
             {error && (
               <div className="bg-red-50 text-red-600 text-sm p-3 rounded-lg">
                 {error}
@@ -113,13 +120,23 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
             {/* Identifier */}
             {loginMode === 'EMAIL' ? (
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">
+                <label
+                  htmlFor="login-email"
+                  className="block text-sm font-semibold text-slate-700 mb-2"
+                >
                   Email Address
                 </label>
                 <div className="relative">
                   <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 h-5 w-5" />
                   <input
+                    id="login-email"
+                    name="email"
                     type="email"
+                    inputMode="email"
+                    autoComplete="username"
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
@@ -130,13 +147,23 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
               </div>
             ) : (
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">
+                <label
+                  htmlFor="login-phone"
+                  className="block text-sm font-semibold text-slate-700 mb-2"
+                >
                   Phone Number
                 </label>
                 <div className="relative">
                   <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 h-5 w-5" />
                   <input
+                    id="login-phone"
+                    name="phone"
                     type="tel"
+                    inputMode="tel"
+                    autoComplete="tel"
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
                     value={phoneNumber}
                     onChange={(e) => setPhoneNumber(e.target.value)}
                     required
@@ -149,13 +176,22 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
 
             {/* Password */}
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-2">
+              <label
+                htmlFor="login-password"
+                className="block text-sm font-semibold text-slate-700 mb-2"
+              >
                 Password
               </label>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 h-5 w-5" />
                 <input
+                  id="login-password"
+                  name="password"
                   type={showPassword ? 'text' : 'password'}
+                  autoComplete="current-password"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
