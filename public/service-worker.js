@@ -80,6 +80,20 @@ self.addEventListener("fetch", (event) => {
 
   if (request.method !== "GET") return;
 
+  const url = new URL(request.url);
+  const isApiRequest = url.pathname.includes("/api/");
+
+  // API requests → network first (never cache)
+  if (isApiRequest) {
+    event.respondWith(
+      fetch(request).catch(() => {
+        // Fall back to cache only if network fails
+        return caches.match(request);
+      })
+    );
+    return;
+  }
+
   // HTML requests → network first
   if (request.headers.get("accept")?.includes("text/html")) {
     event.respondWith(

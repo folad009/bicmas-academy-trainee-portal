@@ -1,5 +1,81 @@
+import {
+  clearAuth,
+  getRefreshToken,
+  setAccessToken,
+  setRefreshToken,
+} from "@/utils/auth";
+
 const BASE_URL =
   'https://bicmas-academy-main-backend-production.up.railway.app/api/v1';
+
+let refreshInFlight: Promise<boolean> | null = null;
+
+/**
+ * Exchange refresh token for a new access token.
+ * Deduplicates concurrent refresh calls. If backend route differs, align with server (e.g. /auth/refresh-token).
+ */
+export async function refreshSession(): Promise<boolean> {
+  if (refreshInFlight) return refreshInFlight;
+
+  refreshInFlight = (async () => {
+    try {
+      const refreshToken = getRefreshToken();
+      if (!refreshToken) return false;
+
+      const res = await fetch(`${BASE_URL}/auth/refresh`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refreshToken }),
+      });
+
+      const text = await res.text();
+      let data: Record<string, unknown> = {};
+      try {
+        if (text) data = JSON.parse(text) as Record<string, unknown>;
+      } catch {
+        data = {};
+      }
+
+      if (!res.ok) {
+        clearAuth();
+        window.dispatchEvent(new Event("bicmas:auth-expired"));
+        return false;
+      }
+
+      const nested = data.data as Record<string, unknown> | undefined;
+      const accessToken =
+        (data.accessToken as string | undefined) ??
+        (data.token as string | undefined) ??
+        (nested?.accessToken as string | undefined);
+
+      if (!accessToken || typeof accessToken !== "string") {
+        clearAuth();
+        window.dispatchEvent(new Event("bicmas:auth-expired"));
+        return false;
+      }
+
+      setAccessToken(accessToken);
+
+      const newRefresh =
+        (data.refreshToken as string | undefined) ??
+        (nested?.refreshToken as string | undefined);
+      if (newRefresh) setRefreshToken(newRefresh);
+
+      window.dispatchEvent(
+        new CustomEvent("bicmas:auth-refreshed", { detail: { accessToken } }),
+      );
+      return true;
+    } catch {
+      clearAuth();
+      window.dispatchEvent(new Event("bicmas:auth-expired"));
+      return false;
+    } finally {
+      refreshInFlight = null;
+    }
+  })();
+
+  return refreshInFlight;
+}
 
 async function parseResponse(response: Response) {
   const text = await response.text();

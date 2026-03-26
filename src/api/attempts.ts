@@ -1,4 +1,5 @@
 import { getAccessToken } from "@/utils/auth";
+import { fetchWithAuthRetry } from "@/utils/fetchWithAuthRetry";
 
 const BASE_URL =
   "https://bicmas-academy-main-backend-production.up.railway.app/api/v1";
@@ -19,15 +20,13 @@ const authFetch = async (url: string, options: RequestInit = {}) => {
     throw new Error("No access token");
   }
 
-  // Properly merge headers without unsafe casting
   const headers = new Headers(options.headers);
-  headers.set('Authorization', `Bearer ${token}`);
 
   if(!(options.body instanceof FormData)) {
     headers.set("Content-Type", "application/json");
   }
 
-  const res = await fetch(url, {
+  const res = await fetchWithAuthRetry(url, {
     ...options,
     headers
   })

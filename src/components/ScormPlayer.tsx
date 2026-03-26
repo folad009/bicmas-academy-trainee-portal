@@ -35,12 +35,20 @@ export const ScormPlayer: React.FC<ScormPlayerProps> = ({
   onUpdateProgress,
   onViewCertificate,
 }) => {
+  const resolvedLessonWithScorm =
+    course.modules
+      ?.flatMap((module: any) =>
+        (module.lessons ?? []).map((lesson: any) => ({
+          moduleId: module.id ?? null,
+          lessonId: lesson.id ?? null,
+          scormPackageId: lesson.scormPackageId ?? null,
+        })),
+      )
+      ?.find((entry: any) => entry.scormPackageId) ?? null;
+
   const resolvedScormPackageId =
     course.scormPackageId ??
-    course.modules
-      ?.flatMap((module: any) => module.lessons ?? [])
-      ?.find((lesson: any) => lesson.scormPackageId)
-      ?.scormPackageId ??
+    resolvedLessonWithScorm?.scormPackageId ??
     null;
 
   // ----------------------------
@@ -148,12 +156,21 @@ export const ScormPlayer: React.FC<ScormPlayerProps> = ({
         lastReportedProgress.current = 0;
         lastSavedProgress.current = 0;
 
-        const res = await fetchScormLaunchUrl(resolvedScormPackageId);
+        const res = await fetchScormLaunchUrl(resolvedScormPackageId, {
+          courseId: course.id,
+          assignmentId: (course as any).assignmentId ?? null,
+          lessonId: resolvedLessonWithScorm?.lessonId ?? null,
+          moduleId: resolvedLessonWithScorm?.moduleId ?? null,
+        });
 
         setLaunchUrl(res.launchUrl);
         setScormAttemptId(res.scormAttemptId);
-      } catch {
-        setError("Failed to load SCORM package");
+      } catch (err) {
+        setError(
+          err instanceof Error && err.message
+            ? `Failed to load SCORM package: ${err.message}`
+            : "Failed to load SCORM package",
+        );
       } finally {
         setLoading(false);
       }

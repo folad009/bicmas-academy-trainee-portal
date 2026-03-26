@@ -1,11 +1,16 @@
-import { createContext, useContext, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import {
   getAccessToken,
   clearAuth,
+  getSessionStartedAtMs,
   getStoredUser,
   saveAuth,
   type AuthUser,
 } from "@/utils/auth";
+import {
+  getSessionEndTimeMs,
+  isAccessTokenExpiredByClock,
+} from "@/utils/jwt";
 
 type AuthContextType = {
   user: AuthUser | null;
@@ -16,9 +21,22 @@ type AuthContextType = {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
+const redirectToLoginIfNeeded = () => {
+  if (typeof window === "undefined") return;
+  if (window.location.pathname !== "/login") {
+    window.location.assign("/login");
+  }
+};
+
 export const AuthProvider = ({ children }: any) => {
   const [user, setUser] = useState<AuthUser | null>(getStoredUser());
   const [token, setToken] = useState<string | null>(getAccessToken());
+
+  const logout = useCallback(() => {
+    clearAuth();
+    setUser(null);
+    setToken(null);
+  }, []);
 
   const login = (data: any) => {
     if (!data || !data.user) {
@@ -28,8 +46,6 @@ export const AuthProvider = ({ children }: any) => {
     const userData = data.user;
     const email = userData?.email;
     const name = email?.split("@")[0] ?? userData?.name ?? "User";
-    const role = userData?.role ?? "Trainee";
-
     const avatarSeed = email ?? userData?.id ?? name;
     const avatar = `https://api.dicebear.com/6.x/identicon/svg?seed=${encodeURIComponent(
       avatarSeed,
@@ -38,8 +54,8 @@ export const AuthProvider = ({ children }: any) => {
     const formattedUser: AuthUser = {
       id: userData?.id ?? "",
       name,
-      email: email ?? null,
-      role,
+      email: email ?? "",
+      role: "Trainee",
       avatar,
     };
 
@@ -53,11 +69,78 @@ export const AuthProvider = ({ children }: any) => {
     setUser(formattedUser);
   };
 
-  const logout = () => {
-    clearAuth();
-    setUser(null);
-    setToken(null);
-  };
+  /** Log out when JWT or 24h session cap is reached; always send user to login. */
+  const logoutDueToExpiredSession = useCallback(() => {
+    logout();
+    redirectToLoginIfNeeded();
+  }, [logout]);
+
+  useEffect(() => {
+    const onRefreshed = (e: Event) => {
+      const detail = (e as CustomEvent<{ accessToken: string }>).detail;
+      if (detail?.accessToken) {
+        setToken(detail.accessToken);
+      }
+    };
+
+    const onExpired = () => {
+      logout();
+      redirectToLoginIfNeeded();
+    };
+
+    window.addEventListener("bicmas:auth-refreshed", onRefreshed);
+    window.addEventListener("bicmas:auth-expired", onExpired);
+    return () => {
+      window.removeEventListener("bicmas:auth-refreshed", onRefreshed);
+      window.removeEventListener("bicmas:auth-expired", onExpired);
+    };
+  }, [logout]);
+
+  /** On load: if already past JWT exp or 24h from login, log out immediately. */
+  useEffect(() => {
+    const t = getAccessToken();
+    if (!t) return;
+    const started = getSessionStartedAtMs(t);
+    if (isAccessTokenExpiredByClock(t, started)) {
+      logoutDueToExpiredSession();
+    }
+  }, [logoutDueToExpiredSession]);
+
+  /** Schedule automatic logout at min(JWT exp, login + 24h). */
+  useEffect(() => {
+    if (!token) return;
+
+    const started = getSessionStartedAtMs(token);
+    const endAt = getSessionEndTimeMs(token, started);
+    const delay = endAt - Date.now();
+
+    if (delay <= 0) {
+      logoutDueToExpiredSession();
+      return;
+    }
+
+    const id = window.setTimeout(logoutDueToExpiredSession, delay);
+    return () => window.clearTimeout(id);
+  }, [token, logoutDueToExpiredSession]);
+
+  /** Tab focus: timers may be throttled; re-check expiry. */
+  useEffect(() => {
+    const check = () => {
+      const t = getAccessToken();
+      if (!t) return;
+      const started = getSessionStartedAtMs(t);
+      if (isAccessTokenExpiredByClock(t, started)) {
+        logoutDueToExpiredSession();
+      }
+    };
+
+    const onVis = () => {
+      if (document.visibilityState === "visible") check();
+    };
+
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
+  }, [logoutDueToExpiredSession]);
 
   return (
     <AuthContext.Provider value={{ user, token, login, logout }}>

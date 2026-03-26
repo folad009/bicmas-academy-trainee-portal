@@ -1,5 +1,9 @@
 import { Course, CourseStatus, LearningPath, UserStats } from "../types";
 import { getAccessToken } from "../utils/auth";
+import { fetchWithAuthRetry } from "../utils/fetchWithAuthRetry";
+
+const API_BASE =
+  "https://bicmas-academy-main-backend-production.up.railway.app/api/v1";
 
 /**
  * Raw backend shapes
@@ -55,26 +59,15 @@ export interface RawScormScore {
 /**
  * Fetch dashboard and map backend → UI-friendly shape
  */
-export async function fetchLearnerDashboard(
-  token: string
-): Promise<LearnerDashboardViewModel> {
+export async function fetchLearnerDashboard(): Promise<LearnerDashboardViewModel> {
+  const token = getAccessToken();
   if (!token) {
     throw new Error("No access token provided");
   }
 
   const [dashboardRes, scormRes] = await Promise.all([
-    fetch(
-      "https://bicmas-academy-main-backend-production.up.railway.app/api/v1/dashboard/learner",
-      {
-        headers: { Authorization: `Bearer ${token}` },
-      }
-    ),
-    fetch(
-      "https://bicmas-academy-main-backend-production.up.railway.app/api/v1/scorm-packages/user/scorm-scores",
-      {
-        headers: { Authorization: `Bearer ${token}` },
-      }
-    ),
+    fetchWithAuthRetry(`${API_BASE}/dashboard/learner`),
+    fetchWithAuthRetry(`${API_BASE}/scorm-packages/user/scorm-scores`),
   ]);
 
   if (!dashboardRes.ok) throw new Error("Failed to load learner dashboard");
@@ -265,13 +258,10 @@ export async function syncProgressAndRefresh(
     throw new Error("No access token");
   }
 
-  const res = await fetch(
-    `https://bicmas-academy-main-backend-production.up.railway.app/api/v1/attempts/${attemptId}/sync-progress`,
+  const res = await fetchWithAuthRetry(
+    `${API_BASE}/attempts/${attemptId}/sync-progress`,
     {
       method: "PATCH",
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
     },
   );
 
@@ -280,5 +270,5 @@ export async function syncProgressAndRefresh(
   }
 
   // After sync, refetch dashboard so aggregates update
-  return fetchLearnerDashboard(token);
+  return fetchLearnerDashboard();
 }

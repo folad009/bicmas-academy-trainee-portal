@@ -1,4 +1,5 @@
 import { getAccessToken } from "@/utils/auth";
+import { fetchWithAuthRetry } from "@/utils/fetchWithAuthRetry";
 
 // Use environment configuration to allow local/dev/staging to override the backend URL
 const BASE_URL =
@@ -17,14 +18,7 @@ export async function fetchAssignedCourses() {
     throw new Error("No access token");
   }
 
-  const res = await fetch(
-    `${BASE_URL}/assignments/assigned-courses`,
-    {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    }
-  );
+  const res = await fetchWithAuthRetry(`${BASE_URL}/assignments/assigned-courses`);
 
   if (res.status === 401) {
     const body = await res.json().catch(() => ({}));

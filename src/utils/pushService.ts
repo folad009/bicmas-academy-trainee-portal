@@ -8,6 +8,10 @@ const urlBase64ToUint8Array = (base64String: string) => {
   return Uint8Array.from(rawData, (char) => char.charCodeAt(0));
 };
 
+const isCapacitorApp = () => {
+  return (window as any).Capacitor !== undefined;
+};
+
 const canUsePushNotifications = () =>
   typeof window !== "undefined" &&
   typeof navigator !== "undefined" &&
@@ -41,7 +45,49 @@ const setNotificationsEnabled = (enabled: boolean) => {
   }
 };
 
+// Register native push notifications for Capacitor
+const registerCapacitorPushNotifications = async () => {
+  try {
+    const { PushNotifications } = await import("@capacitor/push-notifications");
+
+    // Request permission
+    const permission = await PushNotifications.requestPermissions();
+
+    if (permission.receive !== "granted") {
+      console.warn("Push notification permissions not granted");
+      setNotificationsEnabled(false);
+      return null;
+    }
+
+    // Register for push notifications
+    await PushNotifications.register();
+
+    // Listen for incoming push notifications
+    PushNotifications.addListener("pushNotificationReceived", (notification) => {
+      console.log("Push notification received:", notification);
+    });
+
+    // Handle notification tap
+    PushNotifications.addListener("pushNotificationActionPerformed", (notification) => {
+      console.log("Push notification action performed:", notification);
+    });
+
+    setNotificationsEnabled(true);
+    return { registered: true };
+  } catch (error) {
+    console.error("Failed to register Capacitor push notifications", error);
+    setNotificationsEnabled(false);
+    return null;
+  }
+};
+
 export const registerPushNotifications = async () => {
+  // For Capacitor mobile apps, use native push notifications
+  if (isCapacitorApp()) {
+    return registerCapacitorPushNotifications();
+  }
+
+  // For web browsers, use Web Push API
   if (!canUsePushNotifications()) return null;
 
   try {

@@ -1,6 +1,10 @@
+import { getJwtIssuedAtMs } from "@/utils/jwt";
+
 const TOKEN_KEY = "access_token";
 const USER_KEY = "auth_user";
 const REFRESH_TOKEN_KEY = "refresh_token";
+/** Wall-clock start of this login session (ms); used with JWT exp for max 24h session. */
+const SESSION_STARTED_AT_KEY = "auth_session_started_at";
 
 export type AuthUser = {
   id: string;
@@ -103,10 +107,31 @@ export const getStoredUser = (): AuthUser | null => {
 export const setStoredUser = (user: AuthUser) =>
   writeItem(USER_KEY, JSON.stringify(user));
 
+const setSessionStartedAtNow = () =>
+  writeItem(SESSION_STARTED_AT_KEY, String(Date.now()));
+
+/**
+ * Ms since epoch when the user signed in (new session). Used for the 24h cap.
+ * Pass `accessToken` when the session key is missing (e.g. migration) to use JWT `iat`.
+ */
+export const getSessionStartedAtMs = (accessToken?: string | null): number => {
+  const raw = readItem(SESSION_STARTED_AT_KEY);
+  if (raw) {
+    const n = parseInt(raw, 10);
+    if (!Number.isNaN(n) && n > 0) return n;
+  }
+  if (accessToken) {
+    const iat = getJwtIssuedAtMs(accessToken);
+    if (iat != null) return iat;
+  }
+  return Date.now();
+};
+
 export const clearAuth = () => {
   removeItem(TOKEN_KEY);
   removeItem(REFRESH_TOKEN_KEY);
   removeItem(USER_KEY);
+  removeItem(SESSION_STARTED_AT_KEY);
 };
 
 export const saveAuth = ({
@@ -114,6 +139,7 @@ export const saveAuth = ({
   refreshToken,
   user,
 }: StoredAuth) => {
+  setSessionStartedAtNow();
   const accessSaved = setAccessToken(accessToken);
   const refreshSaved = setRefreshToken(refreshToken ?? null);
   const userSaved = setStoredUser(user);
