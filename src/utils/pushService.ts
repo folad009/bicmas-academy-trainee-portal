@@ -97,13 +97,26 @@ const registerCapacitorPushNotifications = async () => {
   return { registered: true as const };
 };
 
+/** Set when web push registration returns null so the UI can explain why. */
+let lastWebPushFailureReason: string | null = null;
+
+export const getLastWebPushFailureReason = () => lastWebPushFailureReason;
+
 const registerWebPushNotifications = async () => {
-  if (!canUsePushNotifications()) return null;
+  lastWebPushFailureReason = null;
 
   const vapidPublicKey = import.meta.env.VITE_VAPID_PUBLIC_KEY;
 
   if (!vapidPublicKey) {
+    lastWebPushFailureReason =
+      "This app build has no VITE_VAPID_PUBLIC_KEY embedded. Add it to .env or .env.production, then run pnpm build and rebuild the APK. (Vercel env only applies to the web deploy, not to mobile builds.)";
     console.warn("Push notifications are disabled: missing VITE_VAPID_PUBLIC_KEY.");
+    return null;
+  }
+
+  if (!canUsePushNotifications()) {
+    lastWebPushFailureReason =
+      "Web Push is not available in this WebView (missing PushManager or service worker). On Android, use native Firebase push: add google-services.json, set VITE_ANDROID_USE_NATIVE_FCM=true, remove reliance on Web Push in this WebView, then rebuild.";
     return null;
   }
 
@@ -123,18 +136,28 @@ const registerWebPushNotifications = async () => {
 
   if (permission !== "granted") {
     setNotificationsEnabled(false);
+    lastWebPushFailureReason =
+      permission === "denied"
+        ? "Notification permission was denied."
+        : "Notification permission was not granted.";
     return null;
   }
 
-  const subscription = await registration.pushManager.subscribe({
-    userVisibleOnly: true,
-    applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
-  });
+  try {
+    const subscription = await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
+    });
 
-  import.meta.env.DEV && console.debug("[Push] Web Push subscription OK:", subscription.endpoint);
+    import.meta.env.DEV && console.debug("[Push] Web Push subscription OK:", subscription.endpoint);
 
-  setNotificationsEnabled(true);
-  return subscription;
+    setNotificationsEnabled(true);
+    return subscription;
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    lastWebPushFailureReason = `Subscribe failed: ${msg}. Check that VITE_VAPID_PUBLIC_KEY matches your server’s key pair.`;
+    return null;
+  }
 };
 
 export const registerPushNotifications = async () => {
@@ -147,6 +170,9 @@ export const registerPushNotifications = async () => {
   } catch (error) {
     console.error("Failed to register push notifications", error);
     setNotificationsEnabled(false);
+    if (!lastWebPushFailureReason && error instanceof Error) {
+      lastWebPushFailureReason = error.message;
+    }
     return null;
   }
 };

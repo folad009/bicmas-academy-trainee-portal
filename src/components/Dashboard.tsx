@@ -33,6 +33,7 @@ import { useAnnouncementNotifications } from "../hooks/useAnnouncementNotificati
 import { getAnnouncements } from "@/services/announcementService";
 import { getAccessToken } from "@/utils/auth";
 import {
+  getLastWebPushFailureReason,
   getNotificationPermission,
   getPushUnavailableHint,
   hasEnabledNotifications,
@@ -132,10 +133,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
         setNotificationStatus("Notifications are blocked in your browser settings.");
       } else {
         setNotificationsEnabled(false);
-        const hint = getPushUnavailableHint();
-        setNotificationStatus(
-          hint ?? "Notifications were not enabled. Check VAPID or Firebase (see .env.example).",
-        );
+        const hint =
+          getLastWebPushFailureReason() ??
+          getPushUnavailableHint() ??
+          "Notifications were not enabled. Check VAPID or Firebase (see .env.example).";
+        setNotificationStatus(hint);
       }
     } catch (error: any) {
       console.error("Failed to enable notifications", error);
