@@ -1,9 +1,9 @@
 import { Course, CourseStatus, LearningPath, UserStats } from "../types";
+import { getApiV1BaseUrl } from "@/config/api";
 import { getAccessToken } from "../utils/auth";
 import { fetchWithAuthRetry } from "../utils/fetchWithAuthRetry";
 
-const API_BASE =
-  "https://bicmas-academy-main-backend-production.up.railway.app/api/v1";
+const API_BASE = getApiV1BaseUrl();
 
 /**
  * Raw backend shapes

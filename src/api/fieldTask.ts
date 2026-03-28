@@ -1,7 +1,6 @@
+import { getApiV1BaseUrl } from "@/config/api";
 import { getAccessToken } from "@/utils/auth";
-
-const BASE_URL =
-  "https://bicmas-academy-main-backend-production.up.railway.app";
+import { fetchWithAuthRetry } from "@/utils/fetchWithAuthRetry";
 
 export async function fieldTask(
   moduleTitle: string,
@@ -30,11 +29,8 @@ export async function fieldTask(
   });
 
   try {
-    const response = await fetch(`${BASE_URL}/api/v1/field-tasks`, {
+    const response = await fetchWithAuthRetry(`${getApiV1BaseUrl()}/field-tasks`, {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
       body: formData,
     });
 

@@ -1,3 +1,5 @@
+import { Capacitor } from "@capacitor/core";
+
 const NOTIFICATIONS_ENABLED_KEY = "notificationsEnabled";
 
 const urlBase64ToUint8Array = (base64String: string) => {
@@ -6,10 +8,6 @@ const urlBase64ToUint8Array = (base64String: string) => {
   const rawData = window.atob(normalized);
 
   return Uint8Array.from(rawData, (char) => char.charCodeAt(0));
-};
-
-const isCapacitorApp = () => {
-  return (window as any).Capacitor !== undefined;
 };
 
 const canUsePushNotifications = () =>
@@ -45,87 +43,119 @@ const setNotificationsEnabled = (enabled: boolean) => {
   }
 };
 
-// Register native push notifications for Capacitor
-const registerCapacitorPushNotifications = async () => {
-  try {
-    const { PushNotifications } = await import("@capacitor/push-notifications");
+/**
+ * Native FCM on Android calls FirebaseMessaging.getInstance(), which requires
+ * `google-services.json` + Firebase setup. Without it the app can crash.
+ * We only use the native plugin when explicitly enabled.
+ *
+ * If `VITE_VAPID_PUBLIC_KEY` is set, we use Web Push inside the WebView instead
+ * (no Firebase needed on the device).
+ */
+function shouldUseNativeCapacitorPush(): boolean {
+  if (!Capacitor.isNativePlatform()) return false;
 
-    // Request permission
-    const permission = await PushNotifications.requestPermissions();
+  const platform = Capacitor.getPlatform();
 
-    if (permission.receive !== "granted") {
-      console.warn("Push notification permissions not granted");
-      setNotificationsEnabled(false);
-      return null;
+  if (platform === "android") {
+    if (import.meta.env.VITE_VAPID_PUBLIC_KEY) {
+      return false;
     }
+    return import.meta.env.VITE_ANDROID_USE_NATIVE_FCM === "true";
+  }
 
-    // Register for push notifications
-    await PushNotifications.register();
+  return true;
+}
 
-    // Listen for incoming push notifications
+let capacitorListenersRegistered = false;
+
+const registerCapacitorPushNotifications = async () => {
+  const { PushNotifications } = await import("@capacitor/push-notifications");
+
+  const permission = await PushNotifications.requestPermissions();
+
+  if (permission.receive !== "granted") {
+    console.warn("Push notification permissions not granted");
+    setNotificationsEnabled(false);
+    return null;
+  }
+
+  if (!capacitorListenersRegistered) {
     PushNotifications.addListener("pushNotificationReceived", (notification) => {
       console.log("Push notification received:", notification);
     });
 
-    // Handle notification tap
     PushNotifications.addListener("pushNotificationActionPerformed", (notification) => {
       console.log("Push notification action performed:", notification);
     });
 
+    capacitorListenersRegistered = true;
+  }
+
+  await PushNotifications.register();
+
+  setNotificationsEnabled(true);
+  return { registered: true as const };
+};
+
+const registerWebPushNotifications = async () => {
+  if (!canUsePushNotifications()) return null;
+
+  const vapidPublicKey = import.meta.env.VITE_VAPID_PUBLIC_KEY;
+
+  if (!vapidPublicKey) {
+    console.warn("Push notifications are disabled: missing VITE_VAPID_PUBLIC_KEY.");
+    return null;
+  }
+
+  const registration = await navigator.serviceWorker.ready;
+  const existingSubscription = await registration.pushManager.getSubscription();
+
+  if (existingSubscription) {
     setNotificationsEnabled(true);
-    return { registered: true };
+    return existingSubscription;
+  }
+
+  let permission = Notification.permission;
+
+  if (permission === "default") {
+    permission = await Notification.requestPermission();
+  }
+
+  if (permission !== "granted") {
+    setNotificationsEnabled(false);
+    return null;
+  }
+
+  const subscription = await registration.pushManager.subscribe({
+    userVisibleOnly: true,
+    applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
+  });
+
+  import.meta.env.DEV && console.debug("[Push] Web Push subscription OK:", subscription.endpoint);
+
+  setNotificationsEnabled(true);
+  return subscription;
+};
+
+export const registerPushNotifications = async () => {
+  try {
+    if (shouldUseNativeCapacitorPush()) {
+      return await registerCapacitorPushNotifications();
+    }
+
+    return await registerWebPushNotifications();
   } catch (error) {
-    console.error("Failed to register Capacitor push notifications", error);
+    console.error("Failed to register push notifications", error);
     setNotificationsEnabled(false);
     return null;
   }
 };
 
-export const registerPushNotifications = async () => {
-  // For Capacitor mobile apps, use native push notifications
-  if (isCapacitorApp()) {
-    return registerCapacitorPushNotifications();
-  }
-
-  // For web browsers, use Web Push API
-  if (!canUsePushNotifications()) return null;
-
-  try {
-    const vapidPublicKey = import.meta.env.VITE_VAPID_PUBLIC_KEY;
-
-    if (!vapidPublicKey) {
-      console.warn("Push notifications are disabled: missing VITE_VAPID_PUBLIC_KEY.");
-      return null;
-    }
-
-    const registration = await navigator.serviceWorker.ready;
-    const existingSubscription = await registration.pushManager.getSubscription();
-
-    if (existingSubscription) {
-      setNotificationsEnabled(true);
-      return existingSubscription;
-    }
-
-    let permission = Notification.permission;
-
-    if (permission === "default") {
-      permission = await Notification.requestPermission();
-    }
-
-    if (permission !== "granted") {
-      setNotificationsEnabled(false);
-      return null;
-    }
-
-    const subscription = await registration.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
-    });
-
-    setNotificationsEnabled(true);
-    return subscription;
-  } catch (error) {
-    console.error("Failed to register push notifications", error);
-    return null;
-  }
+/** User-facing hint when Android cannot enable push (no Firebase + no VAPID). */
+export const getPushUnavailableHint = (): string | null => {
+  if (!Capacitor.isNativePlatform()) return null;
+  if (Capacitor.getPlatform() !== "android") return null;
+  if (import.meta.env.VITE_VAPID_PUBLIC_KEY) return null;
+  if (import.meta.env.VITE_ANDROID_USE_NATIVE_FCM === "true") return null;
+  return "To enable push: add Firebase (google-services.json) and set VITE_ANDROID_USE_NATIVE_FCM=true, or set VITE_VAPID_PUBLIC_KEY for web-style push.";
 };

@@ -30,9 +30,11 @@ import {
 } from "lucide-react";
 
 import { useAnnouncementNotifications } from "../hooks/useAnnouncementNotifications";
+import { getAnnouncements } from "@/services/announcementService";
 import { getAccessToken } from "@/utils/auth";
 import {
   getNotificationPermission,
+  getPushUnavailableHint,
   hasEnabledNotifications,
   registerPushNotifications,
 } from "@/utils/pushService";
@@ -92,34 +94,18 @@ export const Dashboard: React.FC<DashboardProps> = ({
   useEffect(() => {
     const fetchAnnouncements = async () => {
       try {
-        const token = getAccessToken();
-
-        if (!token) {
+        if (!getAccessToken()) {
           return;
         }
 
-        const res = await fetch(`${API_BASE}/announcements`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const data = await getAnnouncements();
 
-        if (res.status === 401) {
-          console.warn("Unauthorized fetching announcements");
-          return;
-        }
-
-        if (!res.ok) {
-          throw new Error(`Failed to fetch announcements: ${res.status}`);
-        }
-
-        const result = await res.json();
-        const data = Array.isArray(result?.data) ? result.data : [];
-
-        data.sort(
+        const sorted = [...data].sort(
           (a: Announcement, b: Announcement) =>
             new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
         );
 
-        setAnnouncements(data);
+        setAnnouncements(sorted);
       } catch (err) {
         console.error("Failed to load announcements", err);
       }
@@ -146,7 +132,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
         setNotificationStatus("Notifications are blocked in your browser settings.");
       } else {
         setNotificationsEnabled(false);
-        setNotificationStatus("Notifications were not enabled.");
+        const hint = getPushUnavailableHint();
+        setNotificationStatus(
+          hint ?? "Notifications were not enabled. Check VAPID or Firebase (see .env.example).",
+        );
       }
     } catch (error: any) {
       console.error("Failed to enable notifications", error);

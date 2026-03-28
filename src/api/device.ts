@@ -1,7 +1,8 @@
+import { getApiV1BaseUrl } from '@/config/api';
 import { getAccessToken } from '@/utils/auth';
+import { fetchWithAuthRetry } from '@/utils/fetchWithAuthRetry';
 
-const BASE_URL =
-  'https://bicmas-academy-main-backend-production.up.railway.app/api/v1';
+const BASE_URL = getApiV1BaseUrl();
 
 export async function registerDevice() {
   const token = getAccessToken();
@@ -21,11 +22,10 @@ export async function registerDevice() {
   const deviceType = isMobile ? 'MOBILE' : 'DESKTOP';
   const deviceName = platform;
 
-  const response = await fetch(`${BASE_URL}/auth/device/register`, {
+  const response = await fetchWithAuthRetry(`${BASE_URL}/auth/device/register`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
     },
     body: JSON.stringify({
       deviceType,

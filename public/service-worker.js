@@ -1,4 +1,4 @@
-const CACHE_NAME = "bicmas-app-v3";
+const CACHE_NAME = "bicmas-app-v4";
 
 /* ---------------- INSTALL ---------------- */
 self.addEventListener("install", (event) => {
@@ -83,14 +83,9 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(request.url);
   const isApiRequest = url.pathname.includes("/api/");
 
-  // API requests → network first (never cache)
+  // API requests → network only (do not serve stale API responses from cache)
   if (isApiRequest) {
-    event.respondWith(
-      fetch(request).catch(() => {
-        // Fall back to cache only if network fails
-        return caches.match(request);
-      })
-    );
+    event.respondWith(fetch(request));
     return;
   }
 

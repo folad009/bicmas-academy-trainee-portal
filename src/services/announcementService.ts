@@ -1,7 +1,6 @@
+import { getApiV1BaseUrl } from "@/config/api";
 import { getAccessToken } from "@/utils/auth";
-
-const API_BASE =
-  "https://bicmas-academy-main-backend-production.up.railway.app/api/v1";
+import { fetchWithAuthRetry } from "@/utils/fetchWithAuthRetry";
 
 export const getAnnouncements = async () => {
   try {
@@ -11,11 +10,7 @@ export const getAnnouncements = async () => {
       throw new Error("No access token available");
     }
 
-    const res = await fetch(`${API_BASE}/announcements`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
+    const res = await fetchWithAuthRetry(`${getApiV1BaseUrl()}/announcements`);
 
     if (!res.ok) {
       throw new Error(

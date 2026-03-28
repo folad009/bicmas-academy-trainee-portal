@@ -1,7 +1,8 @@
+import { getApiV1BaseUrl } from "@/config/api";
 import { getAccessToken } from "@/utils/auth";
+import { fetchWithAuthRetry } from "@/utils/fetchWithAuthRetry";
 
-const BASE_URL =
-  "https://bicmas-academy-main-backend-production.up.railway.app/api/v1";
+const BASE_URL = getApiV1BaseUrl();
 
 export interface BackendLearningPath {
   id: string;
@@ -20,10 +21,7 @@ export async function fetchLearningPaths(): Promise<BackendLearningPath[]> {
 
   let res: Response;
   try {
-    res = await fetch(`${BASE_URL}/learning-paths`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
+    res = await fetchWithAuthRetry(`${BASE_URL}/learning-paths`, {
       signal: controller.signal,
     });
   } catch (err: any) {

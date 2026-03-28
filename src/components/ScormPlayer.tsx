@@ -3,15 +3,8 @@ import { Course } from "../types";
 import { Award, Download, ArrowLeft } from "lucide-react";
 import { fetchScormLaunchUrl } from "@/api/scorm";
 import { useAttemptSync } from "@/hooks/useAttemptSync";
-
-const BASE_URL =
-  "https://bicmas-academy-main-backend-production.up.railway.app/api/v1"
-
-if (!BASE_URL) {
-  throw new Error(
-    "Missing NEXT_PUBLIC_API_BASE_URL environment variable. Please set it before running the app.",
-  );
-}
+import { getApiV1BaseUrl } from "@/config/api";
+import { getAccessToken } from "@/utils/auth";
 
 const ALLOWED_SCORM_ORIGINS = [
   "https://cloud.scorm.com",
@@ -246,20 +239,28 @@ export const ScormPlayer: React.FC<ScormPlayerProps> = ({
   // ----------------------------
   useEffect(() => {
     const onUnload = () => {
-      if (!scormAttemptIdRef.current) return;
+      const attemptId = scormAttemptIdRef.current;
+      if (!attemptId) return;
+
+      const token = getAccessToken();
+      if (!token) return;
 
       const pct = lastReportedProgress.current;
-
       const payload = JSON.stringify({
         completionPercentage: pct,
         status: pct >= 100 ? "COMPLETED" : "IN_PROGRESS",
       });
-      const blob = new Blob([payload], { type: "application/json" });
 
-      navigator.sendBeacon(
-        `${BASE_URL}/attempts/${scormAttemptIdRef.current}`,
-        blob,
-      );
+      const url = `${getApiV1BaseUrl()}/attempts/${attemptId}`;
+      fetch(url, {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: payload,
+        keepalive: true,
+      }).catch(() => {});
     };
 
     window.addEventListener("beforeunload", onUnload);

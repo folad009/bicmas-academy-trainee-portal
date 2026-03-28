@@ -1,12 +1,16 @@
 import {
+  buildRefreshTokenRequestBody,
+  getApiV1BaseUrl,
+  getAuthRefreshUrl,
+} from "@/config/api";
+import {
   clearAuth,
   getRefreshToken,
   setAccessToken,
   setRefreshToken,
 } from "@/utils/auth";
 
-const BASE_URL =
-  'https://bicmas-academy-main-backend-production.up.railway.app/api/v1';
+const BASE_URL = getApiV1BaseUrl();
 
 let refreshInFlight: Promise<boolean> | null = null;
 
@@ -22,10 +26,10 @@ export async function refreshSession(): Promise<boolean> {
       const refreshToken = getRefreshToken();
       if (!refreshToken) return false;
 
-      const res = await fetch(`${BASE_URL}/auth/refresh`, {
+      const res = await fetch(getAuthRefreshUrl(), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ refreshToken }),
+        body: buildRefreshTokenRequestBody(refreshToken),
       });
 
       const text = await res.text();

@@ -1,8 +1,8 @@
+import { getApiV1BaseUrl } from "@/config/api";
 import { getAccessToken } from "@/utils/auth";
 import { fetchWithAuthRetry } from "@/utils/fetchWithAuthRetry";
 
-const BASE_URL =
-  "https://bicmas-academy-main-backend-production.up.railway.app/api/v1";
+const BASE_URL = getApiV1BaseUrl();
 
 type AttemptStatus = "IN_PROGRESS" | "COMPLETED";
 
