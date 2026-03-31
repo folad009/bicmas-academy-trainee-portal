@@ -14,6 +14,17 @@ interface RawAssignment {
   courseId: string;
   dueDate: string | null;
   course: Course;
+  progress?: number | null;
+  status?: string | null;
+  progressStatus?: string | null;
+  scormPackageId?: string | null;
+  attempt?: {
+    id?: string | null;
+    courseId?: string | null;
+    scormPackageId?: string | null;
+    completionPercentage?: number | null;
+    status?: string | null;
+  } | null;
 }
 
 export interface RawLearnerDashboardPayload {
@@ -47,12 +58,20 @@ export interface LearnerDashboardViewModel {
 
 export interface RawScormScore {
   id: string;
+  scormPackageId?: string | null;
+  courseId?: string | null;
   completionPercentage: number;
   scormCloudScoreScaled: number | null;
   displayTitle: string;
   cloudScore?: {
     totalSecondsTracked?: number;
   }
+}
+
+function normalizeProgressValue(value?: number | null) {
+  if (typeof value !== "number") return 0;
+  const percent = value > 0 && value <= 1 ? value * 100 : value;
+  return Math.min(100, Math.max(0, Math.round(percent)));
 }
 
 
@@ -76,7 +95,11 @@ export async function fetchLearnerDashboard(): Promise<LearnerDashboardViewModel
   const raw: RawLearnerDashboardPayload = await dashboardRes.json();
   const scormJson = await scormRes.json();
 
-  const scormData = scormJson?.data ?? [];
+  const scormData = Array.isArray(scormJson?.data)
+    ? scormJson.data
+    : scormJson?.data
+      ? [scormJson.data]
+      : [];
 
   /**
    * ---------------------------------------------------
@@ -91,13 +114,25 @@ export async function fetchLearnerDashboard(): Promise<LearnerDashboardViewModel
       totalSeconds: number;
     }
   >();
+  const scormCourseMap = new Map<string, number>();
 
   scormData.forEach((item: any) => {
-    scormMap.set(item.scormPackageId, {
-      completionPercentage: item.completionPercentage ?? 0,
-      scaledScore: item.scormCloudScoreScaled ?? null,
-      totalSeconds: item.cloudScore?.totalSecondsTracked ?? 0,
-    });
+    if (item?.scormPackageId) {
+      scormMap.set(item.scormPackageId, {
+        completionPercentage: normalizeProgressValue(
+          item.completionPercentage ?? item.scormCloudCompletion ?? 0,
+        ),
+        scaledScore: item.scormCloudScoreScaled ?? null,
+        totalSeconds: item.cloudScore?.totalSecondsTracked ?? 0,
+      });
+    }
+
+    if (item?.courseId) {
+      scormCourseMap.set(
+        item.courseId,
+        normalizeProgressValue(item.completionPercentage ?? item.scormCloudCompletion ?? 0),
+      );
+    }
   });
 
   /**
@@ -106,7 +141,20 @@ export async function fetchLearnerDashboard(): Promise<LearnerDashboardViewModel
    * (because backend doesn't provide it)
    * ---------------------------------------------------
    */
-  const getCourseScormPackageId = (course: any): string | null => {
+  const getCourseScormPackageId = (
+    assignment: RawAssignment,
+    course: any,
+    activeAttempt: any,
+  ): string | null => {
+    const direct =
+      assignment?.scormPackageId ??
+      assignment?.attempt?.scormPackageId ??
+      course?.scormPackageId ??
+      course?.scormPackage?.id ??
+      activeAttempt?.scormPackageId;
+
+    if (direct) return direct;
+
     if (!course?.modules) return null;
 
     for (const module of course.modules) {
@@ -118,6 +166,14 @@ export async function fetchLearnerDashboard(): Promise<LearnerDashboardViewModel
     }
 
     return null;
+  };
+
+  const deriveStatus = (progress: number, rawStatus?: string | null): CourseStatus => {
+    if (progress >= 100) return CourseStatus.Completed;
+    if (progress > 0) return CourseStatus.InProgress;
+    if (rawStatus === "COMPLETED") return CourseStatus.Completed;
+    if (rawStatus === "IN_PROGRESS") return CourseStatus.InProgress;
+    return CourseStatus.NotStarted;
   };
 
   /**
@@ -138,22 +194,53 @@ export async function fetchLearnerDashboard(): Promise<LearnerDashboardViewModel
    */
   const courses: Course[] = (raw.unfinishedCourses ?? []).map((assignment) => {
     const course = assignment.course;
+    const scormPackageId = getCourseScormPackageId(assignment, course, currentAttempt);
 
-    const scormPackageId = getCourseScormPackageId(course);
-
-    // Primary source: SCORM scores
-    let progress = scormPackageId
+    const progressFromScormPackage = scormPackageId
       ? scormMap.get(scormPackageId)?.completionPercentage ?? 0
       : 0;
+    const progressFromScormCourseId = course?.id
+      ? scormCourseMap.get(course.id) ?? 0
+      : 0;
+    const progressFromCurrentAttempt =
+      currentAttempt?.courseId && course?.id && currentAttempt.courseId === course.id
+        ? normalizeProgressValue(
+            currentAttempt.completionPercentage ?? currentAttempt.scormCloudCompletion ?? 0,
+          )
+        : currentAttempt?.courseId &&
+            assignment.courseId &&
+            currentAttempt.courseId === assignment.courseId
+          ? normalizeProgressValue(
+              currentAttempt.completionPercentage ?? currentAttempt.scormCloudCompletion ?? 0,
+            )
+          : currentAttempt?.scormPackageId &&
+              scormPackageId &&
+              currentAttempt.scormPackageId === scormPackageId
+            ? normalizeProgressValue(
+                currentAttempt.completionPercentage ?? currentAttempt.scormCloudCompletion ?? 0,
+              )
+            : 0;
+    const progressFromAssignment = normalizeProgressValue(
+      assignment.attempt?.completionPercentage ??
+        assignment.completionPercentage ??
+        assignment.scormCloudCompletion ??
+        assignment.progress ??
+        0,
+    );
 
-    // Fallback: current active attempt
-    if (
-      progress === 0 &&
-      currentAttempt?.scormPackageId &&
-      currentAttempt.scormPackageId === scormPackageId
-    ) {
-      progress = currentAttempt.completionPercentage ?? 0;
-    }
+    const progress = Math.max(
+      progressFromScormPackage,
+      progressFromScormCourseId,
+      progressFromCurrentAttempt,
+      progressFromAssignment,
+      0,
+    );
+    const rawStatus =
+      assignment.attempt?.status ??
+      assignment.status ??
+      assignment.progressStatus ??
+      currentAttempt?.status ??
+      null;
 
     return {
       ...course,
@@ -161,12 +248,7 @@ export async function fetchLearnerDashboard(): Promise<LearnerDashboardViewModel
       dueDate: assignment.dueDate,
       scormPackageId,
       progress,
-      status:
-        progress >= 100
-          ? CourseStatus.Completed
-          : progress > 0
-          ? CourseStatus.InProgress
-          : CourseStatus.NotStarted,
+      status: deriveStatus(progress, rawStatus),
     };
   });
 
@@ -181,7 +263,7 @@ export async function fetchLearnerDashboard(): Promise<LearnerDashboardViewModel
     0
   );
 
-  const totalLearningHours = Math.round(totalSeconds / 3600);
+  const totalLearningHours = totalSeconds / 3600;
 
   const scoredItems = scormData.filter(
     (item: any) => item.scormCloudScoreScaled != null
@@ -199,6 +281,12 @@ export async function fetchLearnerDashboard(): Promise<LearnerDashboardViewModel
       : raw.averageScore ?? 0;
 
   const activity = raw.learningActivity || {};
+  const normalizeActivityMinutes = (value: unknown): number => {
+    if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) return 0;
+    // Unit-safe fallback: some environments send fractional hours (e.g. 0.5 = 30m).
+    if (value > 0 && value < 1) return Math.max(1, Math.round(value * 60));
+    return Math.round(value);
+  };
 
   /**
    * ---------------------------------------------------
@@ -223,13 +311,13 @@ export async function fetchLearnerDashboard(): Promise<LearnerDashboardViewModel
       averageScore,
 
       weeklyActivity: [
-        activity.Mon || 0,
-        activity.Tue || 0,
-        activity.Wed || 0,
-        activity.Thu || 0,
-        activity.Fri || 0,
-        activity.Sat || 0,
-        activity.Sun || 0,
+        normalizeActivityMinutes(activity.Mon),
+        normalizeActivityMinutes(activity.Tue),
+        normalizeActivityMinutes(activity.Wed),
+        normalizeActivityMinutes(activity.Thu),
+        normalizeActivityMinutes(activity.Fri),
+        normalizeActivityMinutes(activity.Sat),
+        normalizeActivityMinutes(activity.Sun),
       ],
 
       scoreTrend: 0,

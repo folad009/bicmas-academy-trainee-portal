@@ -57,6 +57,8 @@ export const ScormPlayer: React.FC<ScormPlayerProps> = ({
   const [scormAttemptId, setScormAttemptId] = useState<string | null>(null);
   const [scormProgress, setScormProgress] = useState(0);
   const [isCompleted, setIsCompleted] = useState(false);
+  const [isCompletionSyncing, setIsCompletionSyncing] = useState(false);
+  const [completionSyncMessage, setCompletionSyncMessage] = useState<string | null>(null);
 
   const scormAttemptIdRef = useRef<string | null>(null);
   const lastReportedProgress = useRef<number>(0);
@@ -96,18 +98,51 @@ export const ScormPlayer: React.FC<ScormPlayerProps> = ({
     }, 5000);
   };
 
-  const triggerCompletion = () => {
+  const syncCompletionState = async () => {
+    const attemptId = scormAttemptIdRef.current;
+    if (!attemptId) {
+      setIsCompletionSyncing(false);
+      setCompletionSyncMessage(null);
+      return;
+    }
+
+    setIsCompletionSyncing(true);
+    setCompletionSyncMessage("Completion syncing...");
+
+    try {
+      const updated = await syncAttempt(attemptId, course.id);
+      if (updated?.attemptId && updated.attemptId !== scormAttemptIdRef.current) {
+        scormAttemptIdRef.current = updated.attemptId;
+        setScormAttemptId(updated.attemptId);
+      }
+      setCompletionSyncMessage("Completion synced");
+    } catch (e) {
+      console.error("Completion sync failed", e);
+      setCompletionSyncMessage("Completion sync delayed. Certificate will appear shortly.");
+    } finally {
+      window.setTimeout(() => {
+        setIsCompletionSyncing(false);
+      }, 1200);
+    }
+  };
+
+  const triggerCompletion = (syncAfterCompletion = true) => {
     if (completionTriggered.current) return;
     completionTriggered.current = true;
 
     setIsCompleted(true);
+    if (syncAfterCompletion) {
+      void syncCompletionState();
+    }
   };
 
   const handleSessionEnded = async () => {
+    let syncSucceeded = false;
     try {
       if (scormAttemptIdRef.current) {
         const updated = await syncAttempt(scormAttemptIdRef.current, course.id);
         console.log("[PLAYER] Sync returned", updated);
+        syncSucceeded = true;
 
         if (
           updated?.attemptId &&
@@ -126,7 +161,7 @@ export const ScormPlayer: React.FC<ScormPlayerProps> = ({
       console.error("Final sync failed", e);
     }
 
-    triggerCompletion();
+    triggerCompletion(!syncSucceeded);
   };
   // ----------------------------
   // Load SCORM launch URL
@@ -145,6 +180,8 @@ export const ScormPlayer: React.FC<ScormPlayerProps> = ({
 
         completionTriggered.current = false;
         setIsCompleted(false);
+        setIsCompletionSyncing(false);
+        setCompletionSyncMessage(null);
         setScormProgress(0);
         lastReportedProgress.current = 0;
         lastSavedProgress.current = 0;
@@ -290,13 +327,22 @@ export const ScormPlayer: React.FC<ScormPlayerProps> = ({
           <div className="bg-white p-12 rounded-xl shadow text-center">
             <Award size={64} className="mx-auto mb-6 text-green-600" />
             <h1 className="text-3xl font-bold mb-4">Course completed</h1>
+            {completionSyncMessage && (
+              <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs text-slate-600">
+                {isCompletionSyncing && (
+                  <span className="h-3 w-3 animate-spin rounded-full border-2 border-slate-300 border-t-slate-700" />
+                )}
+                <span>{completionSyncMessage}</span>
+              </div>
+            )}
 
             <button
               onClick={onViewCertificate}
-              className="bg-blue-600 text-white px-6 py-3 rounded flex items-center gap-2"
+              className="bg-blue-600 text-white px-6 py-3 rounded flex items-center gap-2 disabled:cursor-not-allowed disabled:bg-blue-400"
+              disabled={isCompletionSyncing}
             >
               <Download size={18} />
-              Certificate
+              {isCompletionSyncing ? "Syncing..." : "Certificate"}
             </button>
           </div>
         </main>

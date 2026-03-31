@@ -1,5 +1,6 @@
 import { Dashboard } from "@/components/Dashboard";
 import { useDashboard } from "@/hooks/useDashboard";
+import { useLibrary } from "@/hooks/useLibrary";
 import { useLearningPaths } from "@/hooks/useLearningPaths";
 import { mapLearningPath } from "@/mappers/learningPathMapper";
 import { useDownloadStore } from "@/store/downloadStore";
@@ -24,10 +25,16 @@ const DEFAULT_STATS: UserStats = {
 export default function DashboardPage() {
   const { user } = useAuth();
   const { data, isLoading, isError } = useDashboard();
+  const dashboardCourses = data?.courses ?? [];
+  const {
+    data: libraryCourses = [],
+    isLoading: isLibraryLoading,
+    isError: isLibraryError,
+  } = useLibrary(dashboardCourses);
   const { data: learningPaths = [] } = useLearningPaths();
   const { download, remove } = useDownloadStore();
   const navigate = useNavigate();
-  const courses = data?.courses ?? [];
+  const courses = libraryCourses.length ? libraryCourses : dashboardCourses;
   const isOnline = useOnlineStatus();
 
   const learningPath = useMemo(() => {
@@ -36,8 +43,8 @@ export default function DashboardPage() {
   }, [learningPaths, courses]);
 
   if (!user) return <Navigate to="/login" replace />;
-  if (isLoading) return <div>Loading dashboard...</div>;
-  if (isError) return <div>We could not load your dashboard right now.</div>;
+  if (isLoading || isLibraryLoading) return <div>Loading dashboard...</div>;
+  if (isError || isLibraryError) return <div>We could not load your dashboard right now.</div>;
 
   return (
     <Dashboard

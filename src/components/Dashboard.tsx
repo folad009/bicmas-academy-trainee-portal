@@ -10,7 +10,6 @@ import {
 import { CourseCard } from "./CourseCard";
 import {
   Clock,
-  BookOpen,
   Award,
   TrendingUp,
   TrendingDown,
@@ -198,6 +197,12 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const currentCourse =
     courses.find((c) => c.status === CourseStatus.InProgress) ||
     courses.find((c) => c.status === CourseStatus.NotStarted);
+
+  const formatLearningTime = (hours: number) => {
+    if (!Number.isFinite(hours) || hours <= 0) return "0m";
+    if (hours < 1) return `${Math.max(1, Math.round(hours * 60))}m`;
+    return `${Math.round(hours)}h`;
+  };
 
   const WeeklyActivityChart = ({ data }: { data: number[] }) => {
     const days = ["M", "T", "W", "T", "F", "S", "S"];
@@ -456,7 +461,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
           />
           <InsightCard
             label="Learning Hours"
-            value={stats.totalLearningHours}
+            value={formatLearningTime(stats.totalLearningHours)}
             icon={Clock}
             color={{ bg: "bg-blue-500", text: "text-blue-500" }}
             trend="+2.5h"
@@ -528,34 +533,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
   </div>
 </div>
 
-          {/* Mini 'Next Up' Card */}
-          <div className="bg-[#008080] rounded-2xl p-6 text-white shadow-lg flex-1 flex flex-col justify-center">
-            <div className="flex items-start justify-between mb-4">
-              <div className="bg-white/20 p-2 rounded-lg backdrop-blur-sm">
-                <BookOpen size={20} />
-              </div>
-              <span className="text-indigo-100 text-xs font-medium uppercase tracking-wider">
-                Recommended
-              </span>
-            </div>
-
-            <h4 className="font-bold text-lg mb-2">
-              {currentCourse?.title || "You're all caught up"}
-            </h4>
-            <p className="text-indigo-100 text-sm mb-4 line-clamp-2">
-              {currentCourse
-                ? `Continue learning (${currentCourse.progress}%)`
-                : "No pending courses"}
-            </p>
-            {currentCourse && (
-              <button
-                onClick={() => onStartCourse(currentCourse.id)}
-                className="bg-white text-[#008080] py-2 rounded-lg text-sm font-bold hover:bg-indigo-50 transition-colors w-full"
-              >
-                Continue
-              </button>
-            )}
-          </div>
+          {/*
+            Mini "Next Up" (Recommended) card intentionally hidden.
+            Keeping markup for quick restore when this widget is needed again.
+          */}
         </div>
       </section>
 

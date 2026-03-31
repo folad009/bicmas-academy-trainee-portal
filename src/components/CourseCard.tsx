@@ -8,6 +8,7 @@ import {
   Award,
   Clock,
 } from "lucide-react";
+import { hasCourseBeenStartedLocally, markCourseStartedLocally } from "@/utils/courseStartState";
 
 interface CourseCardProps {
   course: Course;
@@ -29,7 +30,11 @@ interface CourseCardProps {
  * - enum value
  * ---------------------------------------
  */
-const normalizeStatus = (rawStatus: any, progress: number): CourseStatus => {
+const normalizeStatus = (
+  rawStatus: any,
+  progress: number,
+  startedLocally: boolean,
+): CourseStatus => {
   // Progress is the strongest signal
   if (progress >= 100) return CourseStatus.Completed;
   if (progress > 0) return CourseStatus.InProgress;
@@ -42,6 +47,7 @@ const normalizeStatus = (rawStatus: any, progress: number): CourseStatus => {
   if (rawStatus === CourseStatus.Completed) return CourseStatus.Completed;
   if (rawStatus === CourseStatus.InProgress) return CourseStatus.InProgress;
   if (rawStatus === CourseStatus.NotStarted) return CourseStatus.NotStarted;
+  if (startedLocally) return CourseStatus.InProgress;
 
   return CourseStatus.NotStarted;
 };
@@ -62,7 +68,8 @@ export const CourseCard: React.FC<CourseCardProps> = ({
     Math.min(100, Math.max(0, progress || 0)),
   );
 
-  const safeStatus = normalizeStatus(status, normalizedProgress);
+  const startedLocally = hasCourseBeenStartedLocally(course.id);
+  const safeStatus = normalizeStatus(status, normalizedProgress, startedLocally);
 
   const isCompleted = safeStatus === CourseStatus.Completed;
   const isDisabled = isOfflineMode && !course.isDownloaded;
@@ -122,6 +129,11 @@ export const CourseCard: React.FC<CourseCardProps> = ({
     await onDownload(course.id);
   };
 
+  const handleStart = () => {
+    markCourseStartedLocally(course.id);
+    onStart(course.id);
+  };
+
    // console.log("Course image:", course.thumbnail, course);
 
   // ----------------------------
@@ -156,7 +168,7 @@ export const CourseCard: React.FC<CourseCardProps> = ({
         <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
           {!isDisabled && (
             <button
-              onClick={() => onStart(course.id)}
+              onClick={handleStart}
               className="bg-white text-slate-900 rounded-full p-3 hover:scale-110 transition-transform"
             >
               <Play size={24} fill="currentColor" />
@@ -213,7 +225,7 @@ export const CourseCard: React.FC<CourseCardProps> = ({
 
           <div className="flex items-center justify-between border-t border-slate-100 pt-3">
             <button
-              onClick={() => onStart(course.id)}
+              onClick={handleStart}
               disabled={isDisabled}
               className={`text-sm font-medium ${
                 isDisabled

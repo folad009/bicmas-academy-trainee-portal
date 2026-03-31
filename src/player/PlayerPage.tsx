@@ -1,8 +1,10 @@
+import { useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ScormPlayer } from "@/components/ScormPlayer";
 import { useDashboard } from "@/hooks/useDashboard";
 import { useLibrary } from "@/hooks/useLibrary";
 import { useProgressUpdate } from "@/hooks/useProgressUpdate";
+import { markCourseStartedLocally } from "@/utils/courseStartState";
 
 export default function PlayerPage() {
   const { id } = useParams();
@@ -20,6 +22,12 @@ export default function PlayerPage() {
   const course =
     libraryCourses.find((candidate) => candidate.id === id) ??
     dashboardCourses.find((candidate) => candidate.id === id);
+
+  useEffect(() => {
+    if (id) {
+      markCourseStartedLocally(id);
+    }
+  }, [id]);
 
   if (isDashboardLoading || isLibraryLoading) {
     return <div className="p-10 text-center text-slate-500">Loading course...</div>;

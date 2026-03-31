@@ -46,10 +46,10 @@ const setNotificationsEnabled = (enabled: boolean) => {
 /**
  * Native FCM on Android calls FirebaseMessaging.getInstance(), which requires
  * `google-services.json` + Firebase setup. Without it the app can crash.
- * We only use the native plugin when explicitly enabled.
  *
- * If `VITE_VAPID_PUBLIC_KEY` is set, we use Web Push inside the WebView instead
- * (no Firebase needed on the device).
+ * On Android, `VITE_ANDROID_USE_NATIVE_FCM=true` takes precedence over
+ * `VITE_VAPID_PUBLIC_KEY` so one build can use Web Push on the web and native
+ * FCM in the WebView (PushManager is often unavailable there).
  */
 function shouldUseNativeCapacitorPush(): boolean {
   if (!Capacitor.isNativePlatform()) return false;
@@ -57,10 +57,13 @@ function shouldUseNativeCapacitorPush(): boolean {
   const platform = Capacitor.getPlatform();
 
   if (platform === "android") {
+    if (import.meta.env.VITE_ANDROID_USE_NATIVE_FCM === "true") {
+      return true;
+    }
     if (import.meta.env.VITE_VAPID_PUBLIC_KEY) {
       return false;
     }
-    return import.meta.env.VITE_ANDROID_USE_NATIVE_FCM === "true";
+    return false;
   }
 
   return true;

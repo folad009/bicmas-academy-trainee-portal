@@ -8,13 +8,19 @@ const mapStatus = (status: string, pct: number): CourseStatus => {
   return CourseStatus.NotStarted;
 };
 
+const normalizeProgress = (progress?: number) => {
+  if (typeof progress !== "number") return 0;
+  const percent = progress > 0 && progress <= 1 ? progress * 100 : progress;
+  return Math.min(100, Math.max(0, Math.round(percent)));
+};
+
 export const useAttemptSync = () => {
   const queryClient = useQueryClient();
 
   const syncAttempt = async (attemptId: string, courseId: string) => {
     const data = await syncCourseAttempt(attemptId);
 
-    const pct = data.completionPercentage ?? 0;
+    const pct = normalizeProgress(data.completionPercentage ?? 0);
     const status = data.status;
 
     // Update dashboard cache immediately (single source of truth)
@@ -37,6 +43,12 @@ export const useAttemptSync = () => {
 
     // ❗ Do NOT invalidate immediately
     // Backend may still be stale
+    if (pct >= 100 || status === "COMPLETED") {
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+        queryClient.invalidateQueries({ queryKey: ["assignedCourses"] });
+      }, 1500);
+    }
 
     return data;
   };

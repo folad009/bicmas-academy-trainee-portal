@@ -3,7 +3,8 @@ import { Course } from "@/types";
 
 const normalizeProgress = (progress?: number) => {
   if (typeof progress !== "number") return 0;
-  return Math.min(100, Math.max(0, Math.round(progress)));
+  const percent = progress > 0 && progress <= 1 ? progress * 100 : progress;
+  return Math.min(100, Math.max(0, Math.round(percent)));
 };
 
 const updateCourseProgress = (
