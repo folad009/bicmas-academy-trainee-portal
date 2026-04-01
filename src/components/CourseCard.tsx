@@ -15,6 +15,7 @@ interface CourseCardProps {
   progress: number;
   status?: CourseStatus | string | null;
   onStart: (id: string) => void;
+  onViewCertificate?: (id: string) => void;
   onDownload: (id: string) => void;
   onRemoveDownload: (id: string) => void;
   isOfflineMode: boolean;
@@ -57,6 +58,7 @@ export const CourseCard: React.FC<CourseCardProps> = ({
   progress,
   status,
   onStart,
+  onViewCertificate,
   onDownload,
   onRemoveDownload,
   isOfflineMode,
@@ -241,6 +243,15 @@ export const CourseCard: React.FC<CourseCardProps> = ({
                 <div className="text-yellow-600 flex items-center gap-1 text-xs font-medium bg-yellow-50 px-2 py-1 rounded-full">
                   <Award size={12} /> Certified
                 </div>
+              )}
+              {isCompleted && onViewCertificate && (
+                <button
+                  onClick={() => onViewCertificate(course.id)}
+                  className="text-xs font-medium text-blue-600 hover:text-blue-700"
+                  title="Download Certificate"
+                >
+                  Certificate
+                </button>
               )}
 
               {course.isDownloaded ? (

@@ -124,6 +124,7 @@ export default function LibraryPage() {
             progress={course.progress}
             status={course.status}
             onStart={() => navigate(`/course/${course.id}`)}
+            onViewCertificate={() => navigate(`/certificates?course=${course.id}`)}
             onDownload={() => download(course.id)}
             onRemoveDownload={() => remove(course.id)}
             isOfflineMode={isOffline}

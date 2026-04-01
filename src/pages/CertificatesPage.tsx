@@ -3,24 +3,63 @@ import { Award, Download } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 import { CertificateModal } from "@/components/CertificateModal";
 import { useDashboard } from "@/hooks/useDashboard";
+import { useLibrary } from "@/hooks/useLibrary";
 import { useAuth } from "@/context/AuthContext";
 import { Course, CourseStatus } from "@/types";
+import { claimMyCourseCertificate } from "@/api/certificates";
 
 export default function CertificatesPage() {
   const { user } = useAuth();
   const { data, isLoading, isError } = useDashboard();
+  const dashboardCourses = data?.courses ?? [];
+  const {
+    data: libraryCourses = [],
+    isLoading: isLibraryLoading,
+    isError: isLibraryError,
+  } = useLibrary(dashboardCourses);
   const [searchParams, setSearchParams] = useSearchParams();
   const [selectedCertificate, setSelectedCertificate] = useState<Course | null>(null);
+  const [isPreparingCertificate, setIsPreparingCertificate] = useState<string | null>(
+    null,
+  );
+  const [pageMessage, setPageMessage] = useState<string>("");
+  const [certificateIssuedState, setCertificateIssuedState] = useState<
+    Record<string, "issued_now" | "already_issued">
+  >({});
 
+  const allCourses = libraryCourses.length ? libraryCourses : dashboardCourses;
   const completedCourses = useMemo(
     () =>
-      (data?.courses ?? []).filter(
-        (course) => course.status === CourseStatus.Completed,
-      ),
-    [data?.courses],
+      allCourses.filter((course) => course.status === CourseStatus.Completed),
+    [allCourses],
   );
 
   const requestedCourseId = searchParams.get("course");
+
+  const openCertificate = async (course: Course) => {
+    setPageMessage("");
+    setIsPreparingCertificate(course.id);
+
+    try {
+      const claimed = await claimMyCourseCertificate(course.id);
+      const certificateUrl = claimed?.certificate?.pdfPath ?? course.certificateUrl;
+      setCertificateIssuedState((prev) => ({
+        ...prev,
+        [course.id]: claimed?.issued ? "issued_now" : "already_issued",
+      }));
+
+      setSelectedCertificate({
+        ...course,
+        certificateUrl,
+      });
+    } catch (error: any) {
+      // Keep UX functional: modal can still generate fallback PDF if URL is missing.
+      setPageMessage(error?.message || "Certificate is not ready yet.");
+      setSelectedCertificate(course);
+    } finally {
+      setIsPreparingCertificate(null);
+    }
+  };
 
   useEffect(() => {
     if (!requestedCourseId || selectedCertificate) return;
@@ -30,7 +69,7 @@ export default function CertificatesPage() {
     );
 
     if (requestedCourse) {
-      setSelectedCertificate(requestedCourse);
+      void openCertificate(requestedCourse);
     }
   }, [completedCourses, requestedCourseId, selectedCertificate]);
 
@@ -43,11 +82,11 @@ export default function CertificatesPage() {
 
   if (!user) return null;
 
-  if (isLoading) {
+  if (isLoading || isLibraryLoading) {
     return <div className="p-10 text-center text-slate-500">Loading certificates...</div>;
   }
 
-  if (isError) {
+  if (isError || isLibraryError) {
     return (
       <div className="p-10 text-center text-slate-500">
         We could not load your certificates right now.
@@ -63,6 +102,9 @@ export default function CertificatesPage() {
           <p className="mt-2 text-slate-500">
             Download certificates for every completed course.
           </p>
+          {pageMessage && (
+            <p className="mt-2 text-sm text-amber-700">{pageMessage}</p>
+          )}
         </div>
 
         {!completedCourses.length ? (
@@ -88,16 +130,29 @@ export default function CertificatesPage() {
                     <p className="mt-2 text-sm text-slate-500">
                       {course.description}
                     </p>
+                    {certificateIssuedState[course.id] === "issued_now" && (
+                      <p className="mt-2 text-xs font-medium text-emerald-700">
+                        Issued now
+                      </p>
+                    )}
+                    {certificateIssuedState[course.id] === "already_issued" && (
+                      <p className="mt-2 text-xs font-medium text-blue-700">
+                        Already issued
+                      </p>
+                    )}
                   </div>
                 </div>
 
                 <button
                   type="button"
-                  onClick={() => setSelectedCertificate(course)}
-                  className="mt-6 inline-flex items-center gap-2 rounded-xl bg-[#008080] px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#006d6d]"
+                  onClick={() => openCertificate(course)}
+                  disabled={isPreparingCertificate === course.id}
+                  className="mt-6 inline-flex items-center gap-2 rounded-xl bg-[#008080] px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#006d6d] disabled:cursor-not-allowed disabled:bg-[#008080]/60"
                 >
                   <Download size={16} />
-                  Download Certificate
+                  {isPreparingCertificate === course.id
+                    ? "Preparing certificate..."
+                    : "Download Certificate"}
                 </button>
               </div>
             ))}

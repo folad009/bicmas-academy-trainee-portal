@@ -6,7 +6,7 @@ import { mapLearningPath } from "@/mappers/learningPathMapper";
 import { useDownloadStore } from "@/store/downloadStore";
 import { useAuth } from "@/context/AuthContext";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
-import { UserStats } from "@/types";
+import { CourseStatus, UserStats } from "@/types";
 import { Navigate, useNavigate } from "react-router-dom";
 import { useMemo } from "react";
 
@@ -42,6 +42,18 @@ export default function DashboardPage() {
     return mapLearningPath(learningPaths[0], courses);
   }, [learningPaths, courses]);
 
+  const stats = useMemo(() => {
+    const baseStats = data?.stats ?? DEFAULT_STATS;
+    const completedCourses = courses.filter(
+      (course) => course.status === CourseStatus.Completed,
+    ).length;
+
+    return {
+      ...baseStats,
+      completedCourses,
+    };
+  }, [data?.stats, courses]);
+
   if (!user) return <Navigate to="/login" replace />;
   if (isLoading || isLibraryLoading) return <div>Loading dashboard...</div>;
   if (isError || isLibraryError) return <div>We could not load your dashboard right now.</div>;
@@ -49,7 +61,7 @@ export default function DashboardPage() {
   return (
     <Dashboard
       courses={courses}
-      stats={data?.stats ?? DEFAULT_STATS}
+      stats={stats}
       user={user}
       learningPath={learningPath}
       onStartCourse={(courseId) => navigate(`/course/${courseId}`)}
