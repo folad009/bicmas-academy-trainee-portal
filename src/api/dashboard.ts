@@ -15,6 +15,8 @@ interface RawAssignment {
   dueDate: string | null;
   course: Course;
   progress?: number | null;
+  completionPercentage?: number | null;
+  scormCloudCompletion?: number | null;
   status?: string | null;
   progressStatus?: string | null;
   scormPackageId?: string | null;
@@ -176,6 +178,20 @@ export async function fetchLearnerDashboard(): Promise<LearnerDashboardViewModel
     return CourseStatus.NotStarted;
   };
 
+  const getModuleCompletion = (modules: any[] = []) => {
+    const totalModules = modules.length;
+    const completedModules = modules.filter((module: any) => {
+      if (module?.isCompleted) return true;
+      const lessons = module?.lessons ?? [];
+      return lessons.length > 0 && lessons.every((lesson: any) => lesson?.isCompleted);
+    }).length;
+
+    const allModulesCompleted = totalModules > 0 && completedModules >= totalModules;
+    const moduleProgress =
+      totalModules > 0 ? Math.round((completedModules / totalModules) * 100) : 0;
+    return { totalModules, completedModules, allModulesCompleted, moduleProgress };
+  };
+
   /**
    * ---------------------------------------------------
    * 3) Current attempt fallback
@@ -195,6 +211,10 @@ export async function fetchLearnerDashboard(): Promise<LearnerDashboardViewModel
   const courses: Course[] = (raw.unfinishedCourses ?? []).map((assignment) => {
     const course = assignment.course;
     const scormPackageId = getCourseScormPackageId(assignment, course, currentAttempt);
+    const { totalModules, completedModules, allModulesCompleted, moduleProgress } =
+      getModuleCompletion(
+      course?.modules ?? [],
+    );
 
     const progressFromScormPackage = scormPackageId
       ? scormMap.get(scormPackageId)?.completionPercentage ?? 0
@@ -228,7 +248,7 @@ export async function fetchLearnerDashboard(): Promise<LearnerDashboardViewModel
         0,
     );
 
-    const progress = Math.max(
+    const computedProgress = Math.max(
       progressFromScormPackage,
       progressFromScormCourseId,
       progressFromCurrentAttempt,
@@ -241,6 +261,12 @@ export async function fetchLearnerDashboard(): Promise<LearnerDashboardViewModel
       assignment.progressStatus ??
       currentAttempt?.status ??
       null;
+    const progress = Math.max(
+      computedProgress,
+      moduleProgress,
+      allModulesCompleted ? 100 : 0,
+      rawStatus === "COMPLETED" ? 100 : 0,
+    );
 
     return {
       ...course,
@@ -249,6 +275,8 @@ export async function fetchLearnerDashboard(): Promise<LearnerDashboardViewModel
       scormPackageId,
       progress,
       status: deriveStatus(progress, rawStatus),
+      totalModules,
+      completedModules,
     };
   });
 

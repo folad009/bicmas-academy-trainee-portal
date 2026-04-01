@@ -1,5 +1,6 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { syncCourseAttempt } from "@/api/attempts";
+import { claimMyCourseCertificate } from "@/api/certificates";
 import { CourseStatus } from "@/types";
 
 const mapStatus = (status: string, pct: number): CourseStatus => {
@@ -44,6 +45,31 @@ export const useAttemptSync = () => {
     // ❗ Do NOT invalidate immediately
     // Backend may still be stale
     if (pct >= 100 || status === "COMPLETED") {
+      try {
+        const claimed = await claimMyCourseCertificate(courseId);
+        const certificateUrl = claimed?.certificate?.pdfPath;
+
+        if (certificateUrl) {
+          queryClient.setQueriesData({ queryKey: ["dashboard"] }, (old: any) => {
+            if (!old?.courses) return old;
+
+            return {
+              ...old,
+              courses: old.courses.map((course: any) =>
+                course.id === courseId
+                  ? {
+                      ...course,
+                      certificateUrl,
+                    }
+                  : course,
+              ),
+            };
+          });
+        }
+      } catch (error) {
+        console.warn("[CERTIFICATE] Claim skipped/failed", error);
+      }
+
       setTimeout(() => {
         queryClient.invalidateQueries({ queryKey: ["dashboard"] });
         queryClient.invalidateQueries({ queryKey: ["assignedCourses"] });

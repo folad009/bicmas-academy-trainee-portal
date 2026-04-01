@@ -19,11 +19,27 @@ function deriveStatus(
   return CourseStatus.NotStarted;
 }
 
+function getModuleCompletion(modules: any[]) {
+  const totalModules = modules.length;
+  const completedModules = modules.filter((module: any) => {
+    if (module?.isCompleted) return true;
+    const lessons = module?.lessons ?? [];
+    return lessons.length > 0 && lessons.every((lesson: any) => lesson?.isCompleted);
+  }).length;
+
+  const allModulesCompleted = totalModules > 0 && completedModules >= totalModules;
+  const moduleProgress =
+    totalModules > 0 ? Math.round((completedModules / totalModules) * 100) : 0;
+  return { totalModules, completedModules, allModulesCompleted, moduleProgress };
+}
+
 export function mapAssignedCourse(assignment: any): Course {
   const course = assignment.course;
   const modules = course.modules ?? [];
+  const { totalModules, completedModules, allModulesCompleted, moduleProgress } =
+    getModuleCompletion(modules);
 
-  const progress = normalizeProgress(
+  const baseProgress = normalizeProgress(
     assignment.attempt?.completionPercentage ??
       assignment.completionPercentage ??
       assignment.scormCloudCompletion ??
@@ -35,6 +51,12 @@ export function mapAssignedCourse(assignment: any): Course {
     assignment.status ??
     assignment.progressStatus ??
     assignment.scormStatus;
+  const progress = Math.max(
+    baseProgress,
+    moduleProgress,
+    allModulesCompleted ? 100 : 0,
+    rawStatus === "COMPLETED" ? 100 : 0,
+  );
   const hasAttempt = Boolean(
     assignment.attempt?.id ??
       assignment.attemptId ??
@@ -65,8 +87,8 @@ export function mapAssignedCourse(assignment: any): Course {
     status: deriveStatus(progress, rawStatus, hasAttempt),
     progress,
 
-    totalModules: modules.length,
-    completedModules: 0,
+    totalModules,
+    completedModules,
 
     deadline: assignment.dueDate,
     isDownloaded: false,
