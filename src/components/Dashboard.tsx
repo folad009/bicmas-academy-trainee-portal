@@ -428,7 +428,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
               Stay updated with announcements
             </div>
             <p className="text-sm text-slate-500 mt-1">
-              Turn on browser notifications to receive new academy updates.
+              Turn on browser notifications to receive new updates.
             </p>
             {notificationStatus && (
               <p className="text-sm text-slate-600 mt-2">{notificationStatus}</p>
@@ -455,7 +455,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             label="BICMAS Coins"
             value={stats.bicmasCoins}
             icon={Coins}
-            color={{ bg: "bg-yellow-500", text: "text-yellow-600" }}
+            color={{ bg: "bg-yellow-500", text: "text-white" }}
             trend="Rewards"
             trendDirection="up"
           />
@@ -463,7 +463,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             label="Learning Hours"
             value={formatLearningTime(stats.totalLearningHours)}
             icon={Clock}
-            color={{ bg: "bg-blue-500", text: "text-blue-500" }}
+            color={{ bg: "bg-blue-500", text: "text-white" }}
             trend="+2.5h"
             trendDirection="up"
           />
@@ -471,7 +471,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             label="Courses Done"
             value={stats.completedCourses}
             icon={Award}
-            color={{ bg: "bg-purple-500", text: "text-purple-500" }}
+            color={{ bg: "bg-purple-500", text: "text-white" }}
             trend={`${stats.completedCoursesTrend > 0 ? "+" : ""}${stats.completedCoursesTrend}`}
             trendDirection={stats.completedCoursesTrend >= 0 ? "up" : "down"}
           />
@@ -479,7 +479,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             label="Avg. Score"
             value={`${stats.averageScore}%`}
             icon={TrendingUp}
-            color={{ bg: "bg-emerald-500", text: "text-emerald-500" }}
+            color={{ bg: "bg-emerald-500", text: "text-white" }}
             trend={`${stats.scoreTrend > 0 ? "+" : ""}${stats.scoreTrend}%`}
             trendDirection={stats.scoreTrend >= 0 ? "up" : "down"}
           />
